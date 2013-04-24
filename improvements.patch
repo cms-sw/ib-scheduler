@@ -1,0 +1,110 @@
+Index: ws_sso_content_reader.py
+===================================================================
+--- ws_sso_content_reader.py	(revision 2455)
++++ ws_sso_content_reader.py	(working copy)
+@@ -76,7 +76,10 @@
+     getSSOCookie(opener, target_url, cookie, debug)
+     hasCookie = True 
+     result = getResponseContent(opener, target_url, post_data, debug)
+-  except:
++  except Exception, e:
++    if debug:
++      import traceback
++      traceback.print_exc()
+     result = ""
+   if hasCookie:
+     burl = getParentURL(target_url)
+Index: tagCollectorAPI.py
+===================================================================
+--- tagCollectorAPI.py	(revision 2455)
++++ tagCollectorAPI.py	(working copy)
+@@ -32,9 +32,10 @@
+ 
+ # ==============================END=OF=CONSTANTS==================================
+ 
+-def doWget(url, debug=False, postData=None):
++def doWget(url, debug=True, postData=None):
+     global cert_path
+     global key_path
++    print url
+     return ws_sso_content_reader.getContent(url, cert_path, key_path, postData, debug)
+ 
+ # ================================================================================
+@@ -257,7 +258,7 @@
+     if not re.match("^CMSSW_\d+_\d+_.*",release_name): return
+     args = {"release_name": release_name,
+             "architecture_name": architecture_name,
+-            "dict": json.dumps(kwds)}
++            "dict": json.dumps(kwds).replace(" ", "")}
+     url = urllib.urlencode(args)
+     print url
+     output = doWget(tcBaseURL + 'requestTask?' + url)
+Index: autoIB.py
+===================================================================
+--- autoIB.py	(revision 2455)
++++ autoIB.py	(working copy)
+@@ -14,8 +14,8 @@
+ from commands import getstatusoutput
+ from getpass import getuser
+ 
+-def sh(s, **kwds):
+-  return getstatusoutput(s, **kwds)
++def format(s, **kwds):
++  return s % kwds
+ 
+ def process():
+   # Get the first task from the list
+@@ -30,13 +30,16 @@
+   if not opts.workdir:
+     print "Please specify a workdir"
+     sys.exit(1)
+-  payload = tagCollectorAPI.getPendingRequests(opts.matchRelease, opts.matchArch , "TASK")
+-  if not payload:
++  task = tagCollectorAPI.getPendingRequests(opts.matchRelease, opts.matchArch , "TASK")
++  if not task:
+     print "Nothing to be done which matches release %s and architecture %s" (opts.matchArch, opts.matchRelease)
+     sys.exit(1)
+   
++  if not task.has_key("tags"):
++    print "Request task %s does not have a payload" % task["id"] 
++  payload = task["tags"]
+   if not payload.has_key("build-task"):
+-    print "Request task %s is not a valid build task" % payload["id"]
++    print "Request task %s is not a valid build task" % task["id"]
+     sys.exit(1)
+ 
+   buildTask = payload["build-task"]
+@@ -44,23 +47,22 @@
+     print "Unknown task for request %s: %s" % (payload["id"], buildTask)
+     sys.exit(1)
+   
+-  print payload
+-  sh("set -ex\n"
+-     "mkdir -p %(workdir)s\n"
+-     "cd %(workdir)s\n"
+-     "cvs co -r %(cmsdistTag)s CMSDIST\n"
+-     "cvs co -r %(pkgtoolsTag)s PKGTOOLS\n"
+-     "echo \"### RPM cms dummy 1.0\\n%prep\\n%build\\n%install\\n\" > CMSDIST/dummy.spec\n"
+-     "PKGTOOLS/cmsBuild --repository %(repository)s --architecture %(architecture)s --work-dir b build %(package)s\n"
+-     "PKGTOOLS/cmsBuild --repository %(repository)s --upload-tmp-repository %(tmpRepository)s %(syncBack)s --architecture %(architecture)s --work-dir b upload %(package)s\n",
++  print getstatusoutput(format("set -ex ;\n"
++     "mkdir -p %(workdir)s ;\n"
++     "cd %(workdir)s ;\n"
++     "(cvs co -r %(cmsdistTag)s CMSDIST ;\n"
++     "cvs co -r %(pkgtoolsTag)s PKGTOOLS ;\n"
++     "echo \"### RPM cms dummy 1.0\n%%prep\n%%build\n%%install\n\" > CMSDIST/dummy.spec ;\n"
++     "PKGTOOLS/cmsBuild --repository %(repository)s --architecture %(architecture)s --work-dir b build %(package)s --debug ;\n"
++     "PKGTOOLS/cmsBuild --repository %(repository)s --upload-tmp-repository %(tmpRepository)s %(syncBack)s --architecture %(architecture)s --work-dir b upload %(package)s ) | tee %(workdir)s/log ",
+      workdir=opts.workdir,
+      cmsdistTag=payload["CMSDIST"],
+      pkgtoolsTag=payload["PKGTOOLS"],
+-     architecture=payload["architecture"],
++     architecture=task["architecture_name"],
+      package=payload["package"],
+      repository=payload["repository"],
+      syncBack=payload["syncBack"] == "True" and "--sync-back" or "",
+-     tmpRepository=payload["tmpRepository"])
++     tmpRepository=payload["tmpRepository"]))
+ 
+ def listTasks():
+   # Get the first task from the list
