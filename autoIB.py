@@ -46,10 +46,12 @@ def expandDates(s):
   pw=str(int((today + timedelta(days=-7)).strftime("%W")) % 2)
   return strftime(s.replace("@TW", tw).replace("@NW", nw).replace("@PW", pw))
 
+# Sanitized caracters which could possibly allow execution of unwanted
+# commands.
 def sanitize(s):
   if not s:
     return ""
-  return re.sub("[^0-9a-zA-Z_,:.-]", "", s)
+  return re.sub("[.]/", ".", re.sub("[^0-9a-zA-Z_,:./-]", "", s))
   
 def format(s, **kwds):
   return s % kwds
