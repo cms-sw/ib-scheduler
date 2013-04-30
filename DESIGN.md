@@ -158,15 +158,10 @@ Sometimes it's useful for testing purposes to be able to override `CMSDIST` and
 / or `PKGTOOLS` tags or even single files into `CMSDIST`.
 
 Overriding tags can be done by using the `--cmsdist TAG` and `--pkgtools TAG`
-options.
+options. By default both tags are assumed to be in the official `cms-sw` git
+repositories, this can be changed by using the github syntax for private repositories, e.g.:
 
-Overriding single files in `CMSDIST` can be done by using the `--override`
-option instead. It take a comma separate list of `file:revision` pairs. So for
-example one could use:
-
-  --override scram-project-build.spec:1.125
-
-to overide `scram-project-build.spec` with revision `1.125`.
+  --cmsdist <user>:<branch-or-tag>
 
 ### Processing tasks
 
