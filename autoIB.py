@@ -110,6 +110,15 @@ def process():
   payload = {"debug": False}
   task_id, architecture_name, release_name, payloadNew = tasks[0]
   payload.update(payloadNew)
+
+  # We can now specify tags in the format repository:tag to pick up branches
+  # from different people.
+  payload["pkgtools_remote"] = "cms-sw"
+  payload["cmsdist_remote"] = "cms-sw"
+  if ":" in payload["PKGTOOLS"]:
+    payload["pkgtools_remote"], payload["PKGTOOLS"] = payload["PKGTOOLS"].split(":", 1)
+  if ":" in payload["CMSDIST"]:
+    payload["cmsdist_remote"], payload["CMSDIST"] = payload["CMSDIST"].split(":", 1)
   
   if not payload.has_key("build-task"):
     print "Request task %s is not a valid build task" % task_id
@@ -163,10 +172,10 @@ def process():
        "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
        "  echo '/1 :pserver:anonymous@cmscvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
        "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE;\n"
-       "  git clone git://github.com/cms-sw/cmsdist.git %(task_id)s/CMSDIST;\n"
+       "  git clone git://github.com/%(cmsdistRemote)s/cmsdist.git %(task_id)s/CMSDIST;\n"
        "  pushd %(task_id)s/CMSDIST; git checkout %(cmsdistTag)s; popd;\n"
        "  PKGTOOLS_TAG=\"`echo %(pkgtoolsTag)s | sed -e's/\\(V[0-9]*-[0-9]*\\).*/\\1-XX/'`\";\n"
-       "  git clone git://github.com/cms-sw/pkgtools.git %(task_id)s/PKGTOOLS\n"
+       "  git clone git://github.com/%(pkgtoolsRemote)s/pkgtools.git %(task_id)s/PKGTOOLS\n"
        "  pushd %(task_id)s/PKGTOOLS; git checkout $PKGTOOLS_TAG; popd;\n"
        "  echo \"### RPM cms dummy `date +%%s`\n%%prep\n%%build\n%%install\n\" > %(task_id)s/CMSDIST/dummy.spec ;\n"
        "  set -x ;\n"
@@ -182,6 +191,8 @@ def process():
        debug=payload["debug"] == True and "--debug" or "",
        cmsdistTag=sanitize(payload["CMSDIST"]),
        pkgtoolsTag=sanitize(payload["PKGTOOLS"]),
+       cmsdistRemote=sanitize(payload["cmsdist_remote"]),
+       pkgtoolsRemote=sanitize(payload["pkgtools_remote"]),
        architecture=sanitize(architecture_name),
        release_name=sanitize(release_name),
        base_release_name=re.sub("_[^_]*patch[0-9]*$", "", sanitize(payload["real_release_name"])),
