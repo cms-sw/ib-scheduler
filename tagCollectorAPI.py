@@ -7,10 +7,7 @@ scriptPath = os.path.dirname( os.path.abspath(sys.argv[0]) )
 if scriptPath not in sys.path:
     sys.path.append(scriptPath)
 
-try: 
-    import simplejson as json
-except ImportError: 
-    import json
+from all_json import loads, dumps
 
 def format(s, **kwds):
   return s % kwds
@@ -35,7 +32,7 @@ def getRequestData(request, dryRun=False, tcBaseURL = tcBaseURL):
     print "raw output:\n" + raw_output
     if not raw_output:
       return None
-    data = json.loads(raw_output)
+    data = loads(raw_output)
     print "data=" + str(data)
     return data
 
@@ -52,7 +49,7 @@ def getPendingRequests(release_pattern=None, architecture_pattern=None, requestT
     raw_output = str(doWget(url))
     if not raw_output:
       return None
-    requests = json.loads(raw_output)
+    requests = loads(raw_output)
     for request in requests:
         data = getRequestData(request, dryRun=dryRun, tcBaseURL = tcBaseURL)
         if data:
@@ -69,7 +66,7 @@ def getBuildingRequests(rel=None, architecture_names=None, dryRun=False, tcBaseU
     print "going to receive pending %s requests: %s" % (type, url)
     raw_output = str(doWget(url))
     print "raw output: " + raw_output
-    requests = json.loads(raw_output)
+    requests = loads(raw_output)
     ret_data = []
     for request in requests:
         data = getRequestData(request, dryRun=dryRun, tcBaseURL = tcBaseURL)
@@ -164,7 +161,7 @@ def listPendingTasks(state="Pending", release_pattern=".*", architecture_pattern
     raw_output = str(doWget(url))
     if not raw_output:
       return None
-    requests = json.loads(raw_output)
+    requests = loads(raw_output)
     data = [getRequestData(request, dryRun=False, tcBaseURL = tcBaseURL) for request in requests]
     data2 = [r for r in data if r and re.match(release_pattern, r["release_name"])]
     data3 = [r for r in data2 if re.match(architecture_pattern, r["architecture_name"])]
@@ -262,7 +259,7 @@ def createTaskRequest(release_name, architecture_name, request_type="TASK", tcBa
     args = {"release_name": release_name,
             "architecture_name": architecture_name,
             "type": request_type,
-            "dict": json.dumps(kwds)}
+            "dict": dumps(kwds)}
     url = urllib.urlencode(args)
     output = doWget(tcBaseURL + 'requestTask?' + url)
     if not output == None and len(output) == 0:
@@ -277,7 +274,7 @@ def getProductionArchitecture(release_name, tcBaseURL = tcBaseURL, dryRun=False)
     architecture = None
     if raw_output:
       print "raw output: " + raw_output
-      architecture = json.loads(raw_output)
+      architecture = loads(raw_output)
     return architecture
 
 def getReleaseExternal(release_name, architecture_name):

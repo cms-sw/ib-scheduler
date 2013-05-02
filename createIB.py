@@ -3,10 +3,7 @@
 import sys, os
 import tagCollectorAPI
 from optparse import OptionParser
-try:
-  import json as json
-except:
-  import simplejson as json
+from all_json import loads,dumps
 
 if __name__ == '__main__':
   parser = OptionParser(usage="%(prog)s [--dry-run] -r <release-cycle> -p <parent-release> <archs>")
@@ -21,7 +18,7 @@ if __name__ == '__main__':
     parser.error("Please specify one and only one release cycle you want to create an IB for.")
   architectures = args[0].split(',')
 
-  json_archs = json.dumps([x.strip() for x in architectures])
+  json_archs = dumps([x.strip() for x in architectures])
   release = 'CMSSW_' + opts.releaseCycles.replace('.','_') + '_X'
 
   isReleaseCreated, snapshotName = tagCollectorAPI.mkSnapshot(release, architectures=json_archs, parentRelease=opts.parentRelease)

@@ -5,16 +5,15 @@ from optparse import OptionParser
 from commands import getstatusoutput
 from sys import exit
 import urllib2
-try:
-  import json
-except:
-  import simplejson as json
+# Apparently there are many ways to import json, depending on the python
+# version. This should make sure you get one.
+from all_json import loads
 
 def getAnnouncedReleases(query={}):
   url = "https://cmssdt.cern.ch/tc/getReleasesInformation"
   query = "&".join("%s=%s" % x for x in query.iteritems())
   results = urllib2.urlopen(url + "?" + query)
-  data = json.loads(results.read())
+  data = loads(results.read())
   return data["data"].keys()
 
 def withGridEnv(command, **kwds):
