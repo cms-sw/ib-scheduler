@@ -358,8 +358,8 @@ def requestBuildPackage():
                  "However, this will happen only for %(package)s, continuations will still fetch those from the tagcolletor.", package=options["package"])
 
   if opts.cmsdist and opts.continuations:
-    print package("WARNING: you have specified --pkgtools to overwrite the PKGTOOLS tag coming from tag collector.\n"
-                  "However, this will happen only for %(package)s, continuations will still fetch those from the tagcolletor.", package=options["package"])
+    print format("WARNING: you have specified --cmsdist to overwrite the PKGTOOLS tag coming from tag collector.\n"
+                 "However, this will happen only for %(package)s, continuations will still fetch those from the tagcolletor.", package=options["package"])
 
   cmsdistTagUrl = "http://cmstags.cern.ch/tc/public/ReleaseExternalsXML?" + urllib.urlencode({"release": options["release_name"], 
                                                                                        "architecture": options["architecture_name"]})
