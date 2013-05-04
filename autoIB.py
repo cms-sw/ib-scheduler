@@ -172,6 +172,7 @@ def process():
        "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
        "  echo '/1 :pserver:anonymous@cmscvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
        "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE;\n"
+       "  echo 'Building %(package)s using %(cmsdistRemote)s:%(cmsdistTag)s';\n"
        "  git clone git://github.com/%(cmsdistRemote)s/cmsdist.git %(task_id)s/CMSDIST;\n"
        "  pushd %(task_id)s/CMSDIST; git checkout %(cmsdistTag)s; popd;\n"
        "  PKGTOOLS_TAG=\"`echo %(pkgtoolsTag)s | sed -e's/\\(V[0-9]*-[0-9]*\\).*/\\1-XX/'`\";\n"
