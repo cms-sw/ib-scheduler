@@ -2,7 +2,6 @@
 import os, sys
 from glob import glob
 import time
-from shutil import rmtree
 
 def cleanRepo(repo, days, trans, dryRun, quiet):
   if days<7:   days=7
@@ -27,6 +26,7 @@ def cleanRepo(repo, days, trans, dryRun, quiet):
   cutOffTime = time.time() - (days*24*60*60)
   toDelete = {}
   for d in glob(os.path.join(cache,repoName+".*-*")):
+    if d[-6:] == ".delme": continue
     rep = os.path.basename(d)
     ts  = os.path.getmtime(d)
     if not toDelete.has_key(ts): toDelete[ts]=[]
@@ -53,8 +53,10 @@ def cleanRepo(repo, days, trans, dryRun, quiet):
       else:
         if not quiet: print "  Deleting %s" % rep
         repo = os.path.join(cache,rep)
-        os.rename(repo,repo+".delete")
-        rmtree(repo+".delete")
+        os.rename(repo,repo+".delme")
+        os.system("rm -rf "+repo+".delme")
+  if not quiet: print "Deleting any left over %s/*.delme" % cache
+  os.system("cd %s; touch foo.delme; rm -rf *.delme" % cache)
   return
 
 # ================================================================================
@@ -68,8 +70,17 @@ def cleanRepos(repo, days=7, trans=10, dryRun=False, quiet=False):
     subRepo = re.sub('-cache$','',cache)
     if not quiet: print "Checking repository %s" % subRepo
     cleanRepo(subRepo, days, trans, dryRun, quiet)
+  if dryRun: return
+  cutOffTime = time.time() - (2*24*60*60)
+  tmpdir = os.path.abspath(repo+"/../tmp")
+  for tmp in glob(tmpdir+"/tmp.*"):
+    if (tmp[-6:] != ".delme") and (os.path.getmtime(tmp)<cutOffTime):
+      os.rename(tmp,tmp+".delme")
+      os.system("rm -rf "+tmp+".delme")
+  if not quiet: print "Deleting any left over %s/*.delme" % tmpdir
+  os.system("cd %s; touch foo.delme; rm -rf *.delme" % tmpdir)
   return
-    
+
 # ================================================================================
 
 def usage():
@@ -106,7 +117,8 @@ if __name__ == "__main__" :
     elif o in ('-t','--transactions-keep',):
       trans = int(a)
 
-  cleanRepos(repo, days, trans, dryRun, quiet)
+  for rep in repo.split(","):
+    cleanRepos(rep, days, trans, dryRun, quiet)
   print '\n-------------------------------------------------------\n'
   cmd = 'df -h /data'
   pipe = os.popen(cmd)
