@@ -4,7 +4,7 @@ from glob import glob
 import time
 
 def cleanRepo(repo, days, trans, dryRun, quiet):
-  if days<7:   days=7
+  if days<2:   days=2
   if trans<10: trans = 10
   if dryRun:   quiet = False
   repoName  = os.path.basename(repo)
