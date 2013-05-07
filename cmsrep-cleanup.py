@@ -70,13 +70,19 @@ def cleanRepos(repo, days=7, trans=10, dryRun=False, quiet=False):
     subRepo = re.sub('-cache$','',cache)
     if not quiet: print "Checking repository %s" % subRepo
     cleanRepo(subRepo, days, trans, dryRun, quiet)
+
+# ================================================================================
+
+def cleanTmp(tmpdir, dryRun=False, quiet=False):
   if dryRun: return
   cutOffTime = time.time() - (2*24*60*60)
-  tmpdir = os.path.abspath(repo+"/../tmp")
   for tmp in glob(tmpdir+"/tmp.*"):
-    if (tmp[-6:] != ".delme") and (os.path.getmtime(tmp)<cutOffTime):
-      os.rename(tmp,tmp+".delme")
-      os.system("rm -rf "+tmp+".delme")
+    try:
+      if (tmp[-6:] != ".delme") and (os.path.getmtime(tmp)<cutOffTime):
+        os.rename(tmp,tmp+".delme")
+        os.system("rm -rf "+tmp+".delme")
+    except:
+      pass
   if not quiet: print "Deleting any left over %s/*.delme" % tmpdir
   os.system("cd %s; touch foo.delme; rm -rf *.delme" % tmpdir)
   return
@@ -91,7 +97,7 @@ if __name__ == "__main__" :
   import getopt
   options = sys.argv[1:]
   try:
-    opts, args = getopt.getopt(options, 'hqDr:d:t:', ['help','dryRun','quiet','days-keep=','transactions-keep=','repo=',])
+    opts, args = getopt.getopt(options, 'hqDTr:d:t:', ['help','dryRun','quiet','days-keep=','transactions-keep=','repo=','tmp-clean',])
   except getopt.GetoptError:
     usage()
     sys.exit(-2)
@@ -101,6 +107,7 @@ if __name__ == "__main__" :
   days   = 7
   trans  = 10
   quiet  = False
+  tmpClean = False
     
   for o, a in opts:
     if o in ('-h', '--help'):
@@ -108,6 +115,8 @@ if __name__ == "__main__" :
       sys.exit()
     elif o in ('-D','--dryRun',):
       dryRun = True
+    elif o in ('-T','--tmp-clean',):
+      tmpClean = True
     elif o in ('-q','--quiet',):
       quiet = True
     elif o in ('-r','--repo',):
@@ -117,8 +126,14 @@ if __name__ == "__main__" :
     elif o in ('-t','--transactions-keep',):
       trans = int(a)
 
+  tmpDirs = {}
   for rep in repo.split(","):
+    tmpDirs[os.path.abspath(rep+"/../tmp")]=1
     cleanRepos(rep, days, trans, dryRun, quiet)
+
+  if tmpClean:
+    for tmp in tmpDirs: cleanTmp(tmp, dryRun, quiet)
+
   print '\n-------------------------------------------------------\n'
   cmd = 'df -h /data'
   pipe = os.popen(cmd)
