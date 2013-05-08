@@ -26,4 +26,4 @@ if __name__ == '__main__':
     parser.error("Could not create release.")
   if not snapshotName:
     parser.error("Could not create snapshot.")
-  tagCollectorAPI.createIBRequest(snapshotName, architectures)
+  #tagCollectorAPI.createIBRequest(snapshotName, architectures)
