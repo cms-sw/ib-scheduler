@@ -354,7 +354,7 @@ def requestBuildPackage():
     sys.exit(1)
   options = {}
   options["build-task"] = "build-package"
-  options["hostnameFilter"] = sanitize(opts.hostnameFilter)
+  options["hostnameFilter"] = opts.hostnameFilter
   options["real_release_name"] = expandDates(opts.release_name)
   options["release_name"] = re.sub("_[A-Z]+_X", "_X", options["real_release_name"])
   options["architecture_name"] = opts.architecture_name
