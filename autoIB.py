@@ -106,9 +106,20 @@ def process():
     if opts.debug:
       print "Nothing to be done which matches release %s and architecture %s" % (opts.matchArch, opts.matchRelease)
     sys.exit(1)
+  # Look up for a hostname-filter option in the payload and if it is there,
+  # make sure we match it.
+  runnableTask = None
+  for task in tasks:
+    task_id, architecture_name, release_name, payloadNew = task
+    if re.match(payloadNew.get("hostname-filter", ".*"), socket.gethostname()):
+      runnableTask = task
+      break
+  if not runnableTask:
+    print "Nothing to be done on this machine."
+    sys.exit(1)
   # Default payload options.
   payload = {"debug": False}
-  task_id, architecture_name, release_name, payloadNew = tasks[0]
+  task_id, architecture_name, release_name, payloadNew = runnableTask
   payload.update(payloadNew)
 
   # We can now specify tags in the format repository:tag to pick up branches
@@ -182,6 +193,9 @@ def process():
        "  set -x ;\n"
        "  rm -rf %(workdir)s/cms %(workdir)s/b ;\n"
        "  perl -p -i -e 's/### RPM cms cmssw.*/### RPM cms cmssw %(base_release_name)s/' %(task_id)s/CMSDIST/cmssw.spec ;\n"
+       "  perl -p -i -e 's/### RPM cms cmssw-ib .*/### RPM cms cmssw-ib %(base_release_name)s/' %(task_id)s/CMSDIST/cmssw-ib.spec ;\n"
+       "  perl -p -i -e 's/### RPM cms cmssw-qa .*/### RPM cms cmssw-qa %(base_release_name)s/' %(task_id)s/CMSDIST/cmssw-qa.spec ;\n"
+       "  perl -p -i -e 's/### RPM cms cmssw-validation .*/### RPM cms cmssw-validation %(base_release_name)s/' %(task_id)s/CMSDIST/cmssw-validation.spec ;\n"
        "  perl -p -i -e 's/### RPM cms cmssw-patch.*/### RPM cms cmssw-patch %(real_release_name)s/' %(task_id)s/CMSDIST/cmssw-patch.spec ;\n"
        "  %(workdir)s/%(task_id)s/PKGTOOLS/cmsBuild %(debug)s --new-scheduler --cmsdist %(workdir)s/%(task_id)s/CMSDIST %(ignoreErrors)s --builders %(builders)s -j %(jobs)s --repository %(repository)s --architecture %(architecture)s --work-dir %(workdir)s/cms build %(package)s ;\n"
        "  %(workdir)s/%(task_id)s/PKGTOOLS/cmsBuild %(debug)s --new-scheduler --cmsdist %(workdir)s/%(task_id)s/CMSDIST --repository %(repository)s --upload-tmp-repository %(tmpRepository)s %(syncBack)s --architecture %(architecture)s --work-dir %(workdir)s/cms upload %(package)s ;\n"
@@ -326,6 +340,7 @@ def requestBuildPackage():
   parser.add_option("--upload-tmp-repository", metavar="REPOSITORY SUFFIX", dest="tmpRepository", help="Specify repository suffix to use for upload", default=getuser())
   parser.add_option("--pkgtools", metavar="TAG", dest="pkgtools", help="Specify PKGTOOLS version to use. You can specify <user>:<tag> to try out a non official tag.", default=None)
   parser.add_option("--cmsdist", metavar="TAG", dest="cmsdist", help="Specify CMSDIST tag branch to use. You can specify <user>:<tag> to try out a non official tag.", default=None)
+  parser.add_option("--hostname-filter", metavar="HOSTNAME-REGEX", dest="hostnameFilter", help="Specify a given regular expression which must be matched by the hostname of the builder machine.", default=".*")
   parser.add_option("--sync-back", metavar="BOOL", dest="syncBack", action="store_true", help="Specify whether or not to sync back the repository after upload", default=False)
   parser.add_option("--ignore-compilation-errors", "-k", metavar="BOOL", dest="ignoreErrors", help="When supported by the spec, ignores compilation errors and still packages the available build products", action="store_true", default=False)
   parser.add_option("--testbed", metavar="BOOL", dest="useTestBed", help="Use the testbed tag collector to ", action="store_true", default=False)
@@ -340,6 +355,7 @@ def requestBuildPackage():
     sys.exit(1)
   options = {}
   options["build-task"] = "build-package"
+  options["hostnameFilter"] = opts.hostnameFilter
   options["real_release_name"] = expandDates(opts.release_name)
   options["release_name"] = re.sub("_[A-Z]+_X", "_X", options["real_release_name"])
   options["architecture_name"] = opts.architecture_name
