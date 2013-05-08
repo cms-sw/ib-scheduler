@@ -110,7 +110,8 @@ def process():
   # make sure we match it.
   runnableTask = None
   for task in tasks:
-    if re.match(task.get("hostname-filter", ".*"), sockets.hostname()):
+    task_id, architecture_name, release_name, payloadNew = task
+    if re.match(payloadNew.get("hostname-filter", ".*"), socket.gethostname()):
       runnableTask = task
       break
   if not runnableTask:
