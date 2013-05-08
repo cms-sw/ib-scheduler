@@ -1,16 +1,9 @@
 #!/bin/sh
-# Mirror github repositories at CERN
-mkdir -p /build/cmsbuild/mirror
-cd /build/cmsbuild/mirror
-for x in SCRAM pkgtools cmssw-config; do
-  rm -rf $x.git
-  git clone --mirror https://github.com/cms-sw/$x.git
-done
-pushd SCRAM.git
-git push --mirror https://:@git.cern.ch/kerberos/SCRAM.git
-popd
-pushd pkgtools.git
-git push --mirror https://:@git.cern.ch/kerberos/PKGTOOLS.git
-popd
-pushd cmssw-config.git
-git push --mirror https://:@git.cern.ch/kerberos/CMSSW/config.git
+MIRROR=/afs/cern.ch/cms/git-cmssw-mirror
+CERN_REPO=https://:@git.cern.ch/kerberos
+cd $MIRROR/cmssw.git ; git config http.postBuffer 209715200 ; git remote update origin ; git push --mirror $CERN_REPO/CMSSW.git
+cd $MIRROR/cmsdist.git ; git config http.postBuffer 209715200 ; git remote update origin ; git push --mirror $CERN_REPO/CMSDIST.git
+cd $MIRROR/pkgtools.git ; git config http.postBuffer 209715200 ; git remote update origin ; git push --mirror $CERN_REPO/PKGTOOLS.git
+cd $MIRROR/cmssw-config.git ; git config http.postBuffer 209715200 ; git remote update origin ; git push --mirror $CERN_REPO/CMSSW/config.git
+cd $MIRROR/SCRAM.git ; git config http.postBuffer 209715200 ; git remote update origin ; git push --mirror $CERN_REPO/SCRAM.git
+cd $MIRROR/ib-scheduler.git ; git config http.postBuffer 209715200 ; git remote update origin ; git push --mirror $CERN_REPO/ib-scheduler.git
