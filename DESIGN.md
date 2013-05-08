@@ -203,6 +203,11 @@ Future extensions of the system might include time based limitations of on the
 kind of task being executed, i.e. more powerful machines will do more time
 consuming jobs.
 
+In order to avoid that critical tasks are executed on machines which are for
+opportunistic usage, or simply to key a given task to a certain sub-set of
+machines, it is possible to specify the `--hostname-filter <REGEX>` option,
+which will make sure that the hostname of the builder matches `REGEX`.
+
 #### Post-processing logs
 
 Two kind of build logs are available when building a package. The first one is
