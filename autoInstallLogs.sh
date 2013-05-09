@@ -11,11 +11,11 @@ for WEEK in 0 1; do
     CMSSW_WEEKDAY=`python -c "import time;print time.strftime('%a', time.strptime('$CMSSW_DATE', '%Y-%m-%d-%H00')).lower()"`
     CMSSW_HOUR=`python -c "import time;print time.strftime('%H', time.strptime('$CMSSW_DATE', '%Y-%m-%d-%H00')).lower()"`
     CMSSW_QUEUE=`echo $CMSSW_NAME | sed -e 's/CMSSW_\([0-9]\)_\([0-9]\)_.*/\1.\2/'`
-    REL_LOGS="/afs/cern.ch/cms/sw/ReleaseCandidates/$SCRAM_ARCH/www/$CMSSW_WEEKDAY/$CMSSW_QUEUE-$CMSSW_WEEKDAY-$CMSSW_HOUR/$CMSSW_NAME/new/"
+    REL_LOGS="/afs/cern.ch/cms/sw/ReleaseCandidates/$SCRAM_ARCH/www/$CMSSW_WEEKDAY/$CMSSW_QUEUE-$CMSSW_WEEKDAY-$CMSSW_HOUR/$CMSSW_NAME/new"
     if [ -L $REL_LOGS ]; then
       rm -rf $REL_LOGS
     fi
     mkdir -p $REL_LOGS
-    rsync -a --no-group --no-owner cmsbuild@cmsrep.cern.ch:/data/cmssw/cms.week$WEEK/WEB/build-logs/$SCRAM_ARCH/$CMSSW_NAME/logs/html/ $REL_LOGS || true
+    rsync -a --no-group --no-owner cmsbuild@cmsrep.cern.ch:/data/cmssw/cms.week$WEEK/WEB/build-logs/$SCRAM_ARCH/$CMSSW_NAME/logs/html/ $REL_LOGS/ || true
   done
 done
