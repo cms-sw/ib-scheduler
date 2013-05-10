@@ -422,6 +422,7 @@ COMMANDS = {"process": process,
             "request": requestBuildPackage}
 
 if __name__ == "__main__":
+  os.environ["LANG"] = "C"
   commands = [x for x in sys.argv[1:] if not x.startswith("-")]
   if len(commands) == 0 or not commands[0] in COMMANDS.keys():
     print "Usage: autoIB.py <command> [options]\n"
