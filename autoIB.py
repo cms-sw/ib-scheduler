@@ -14,11 +14,15 @@ import xml.parsers.expat
 from commands import getstatusoutput
 from getpass import getuser
 from time import strftime
-from os.path import abspath, join, dirname, exists
+from os.path import abspath, join, dirname, exists, expanduser
 import re
 from Lock import Lock
 from datetime import datetime, timedelta
-from cmssw_secrets import CMSSW_CVSPASS
+try:
+  from cmssw_secrets import CMSSW_CVSPASS
+except ImportError:
+  CMSSW_CVSPASS=file(expanduser("~/.cmssw_secrets")).read()
+
 try:
   from hashlib import sha1 as sha
   def hash(s):

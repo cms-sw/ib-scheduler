@@ -2,6 +2,7 @@
 ###Description: The tool reads cern web services behind SSO using user certificates
 import os, urllib, urllib2, httplib, cookielib, sys, HTMLParser, re
 from optparse import OptionParser
+from os.path import expanduser
 
 def getFile(path):
   npath = os.path.expanduser(path)
@@ -62,6 +63,8 @@ def getSSOCookie(opener, target_url, cookie, debug=False):
   getResponseContent(opener, url, post_data_local, debug)
 
 def getContent(target_url, cert_path, key_path, post_data=None, debug=False, adfslogin=None):
+  cert_path = expanduser(cert_path)
+  key_path = expanduser(key_path)
   opener = urllib2.build_opener(urllib2.HTTPSHandler())
   if adfslogin:
     opener.addheaders = [('Adfs-Login', adfslogin)] #local version of tc test
