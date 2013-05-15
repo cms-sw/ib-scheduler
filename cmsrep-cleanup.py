@@ -4,7 +4,7 @@ from glob import glob
 import time
 
 def cleanRepo(repo, days, trans, dryRun, quiet):
-  if days<2:   days=2
+  if days<1:   days=1
   if trans<10: trans = 10
   if dryRun:   quiet = False
   repoName  = os.path.basename(repo)
@@ -75,7 +75,7 @@ def cleanRepos(repo, days=7, trans=10, dryRun=False, quiet=False):
 
 def cleanTmp(tmpdir, dryRun=False, quiet=False):
   if dryRun: return
-  cutOffTime = time.time() - (2*24*60*60)
+  cutOffTime = time.time() - (6*60*60)
   for tmp in glob(tmpdir+"/tmp.*"):
     try:
       if (tmp[-6:] != ".delme") and (os.path.getmtime(tmp)<cutOffTime):
