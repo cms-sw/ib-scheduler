@@ -53,10 +53,13 @@ def cleanRepo(repo, days, trans, dryRun, quiet):
       else:
         if not quiet: print "  Deleting %s" % rep
         repo = os.path.join(cache,rep)
-        os.rename(repo,repo+".delme")
-        os.system("rm -rf "+repo+".delme")
+        try:
+          os.rename(repo,repo+".delme")
+          os.system("rm -rf "+repo+".delme")
+        except: pass
   if not quiet: print "Deleting any left over %s/*.delme" % cache
-  os.system("cd %s; touch foo.delme; rm -rf *.delme" % cache)
+  try: os.system("cd %s; touch foo.delme; rm -rf *.delme" % cache)
+  except: pass
   return
 
 # ================================================================================
@@ -84,7 +87,8 @@ def cleanTmp(tmpdir, dryRun=False, quiet=False):
     except:
       pass
   if not quiet: print "Deleting any left over %s/*.delme" % tmpdir
-  os.system("cd %s; touch foo.delme; rm -rf *.delme" % tmpdir)
+  try: os.system("cd %s; touch foo.delme; rm -rf *.delme" % tmpdir)
+  except: pass
   return
 
 # ================================================================================
