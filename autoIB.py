@@ -206,8 +206,8 @@ def process():
        "  PKG_BUILT=`find %(workdir)s/cms/RPMS/%(architecture)s -name \"*%(package)s*\"| sed -e's|.*/\\([^+]*+[^+]*+[^.]*\\).*|\\1|'`;\n"
        "  set +x ;\n"
        "  echo Build completed. you can now install the package built by doing: ;\n"
-       "  echo wget http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh ;\n"
-       "  echo sh -x ./bootstrap.sh setup -path w -arch %(architecture)s -r %(repository)s >& bootstrap_%(architecture)s.log ;\n"
+       "  echo \"wget http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh\" ;\n"
+       "  echo \"sh -x ./bootstrap.sh setup -path w -arch %(architecture)s -r %(repository)s >& bootstrap_%(architecture)s.log \";\n"
        "  echo \"(source w/%(architecture)s/external/apt/*/etc/profile.d/init.sh ; apt-get install $PKG_BUILD )\" ;\n"
        "  echo AUTOIB SUCCESS) 2>&1 | tee %(workdir)s/log.%(task_id)s",
        workdir=opts.workdir,
