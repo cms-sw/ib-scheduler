@@ -20,7 +20,7 @@ for WEEK in 0 1; do
     # Decompress logs if they are compressed.
     if [ -f $REL_LOGS/html-logs.tgz ]; then
       pushd $REL_LOGS
-        tar xzvf html-logs.tgz
+        tar xzf html-logs.tgz
       popd
     fi
   done
