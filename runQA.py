@@ -60,7 +60,11 @@ def processScheduledQARequest(requestId, ibName, arch, buildpath=DEFAULT_BUILDPA
   os.environ["SCRAM_ARCH"]=arch
   os.environ["CMSINTBLD_CMS_PATH"]=cmspath
   tagCollectorAPI.setRequestBuilding(requestId, ibName,machine=socket.gethostname(), pid=os.getpid())
-  startTest(ibName, cycle, buildpath, tests, arch)
+  qaStampDir= os.path.join("/afs/cern.ch/cms/sw/ReleaseCandidates",arch,"www/qaTest")
+  qaStampFile = os.path.join(qaStampDir,ibName)
+  if (not os.path.exists(qaStampFile)):
+    os.system("mkdir -p %s; touch %s" % (qaStampDir,qaStampFile))
+    startTest(ibName, cycle, buildpath, tests, arch)
   tagCollectorAPI.finishRequest(requestId)
   
 def getLock(buildpath):
