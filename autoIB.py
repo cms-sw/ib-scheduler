@@ -50,6 +50,13 @@ def expandDates(s):
   pw=str(int((today + timedelta(days=-7)).strftime("%W")) % 2)
   return strftime(s.replace("@TW", tw).replace("@NW", nw).replace("@PW", pw))
 
+def expandRelease(s, release):
+  # The queue is always CMSSW_x_y_X
+  queue = re.sub("(CMSSW_[0-9]+_[0-9]+).*", "\\1_X", release)
+  s = s.replace("@RELEASE", release)
+  s = s.replace("@QUEUE", queue)
+  return s
+
 # Sanitized caracters which could possibly allow execution of unwanted
 # commands.
 def sanitize(s):
@@ -364,7 +371,7 @@ def requestBuildPackage():
   options["real_release_name"] = expandDates(opts.release_name)
   options["release_name"] = re.sub("_[A-Z]+_X", "_X", options["real_release_name"])
   options["architecture_name"] = opts.architecture_name
-  options["repository"] = expandDates(opts.repository)
+  options["repository"] = expandRelease(expandDates(opts.repository).replace("@ARCH", options["architecture_name"]), options["release_name"])
   options["tmpRepository"] = expandDates(opts.tmpRepository)
   options["syncBack"] = opts.syncBack
   options["package"] = expandDates(args[1])
@@ -400,9 +407,9 @@ def requestBuildPackage():
   p.Parse(data)
   options.update(tags)
   if opts.pkgtools:
-    options["PKGTOOLS"] = sanitize(opts.pkgtools)
+    options["PKGTOOLS"] = sanitize(expandRelease(opts.pkgtools, options["release_name"]).replace("@ARCH", options["architecture_name"]))
   if opts.cmsdist:
-    options["CMSDIST"] = sanitize(opts.cmsdist)
+    options["CMSDIST"] = sanitize(expandRelease(opts.cmsdist, options["release_name"]).replace("@ARCH", options["architecture_name"]))
   if not options.get("CMSDIST"):
     print "Unable to find CMSDIST for releases %s on %s" % (options["release_name"], options["architecture_name"])
     sys.exit(1)

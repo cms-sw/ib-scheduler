@@ -163,6 +163,13 @@ repositories, this can be changed by using the github syntax for private reposit
 
   --cmsdist <user>:<branch-or-tag>
 
+It is also possible to specify a few special keywords which get substituted before
+submitting the requets. These are:
+
+* `@ARCH`: the architecture, as specified by the `-a` option.
+* `@RELEASE`: the release name, as specified by the `-r` option.
+* `@QUEUE`: the queue associated to the release, i.e. the `CMSSW_x_y_X`.
+
 ### Processing tasks
 
 The tasks queued by the `request` sub-command described above can be processed
