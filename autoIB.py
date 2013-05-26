@@ -203,7 +203,7 @@ def process():
        "  perl -p -i -e 's/### RPM cms cmssw-patch.*/### RPM cms cmssw-patch %(real_release_name)s/' %(task_id)s/CMSDIST/cmssw-patch.spec ;\n"
        "  %(workdir)s/%(task_id)s/PKGTOOLS/cmsBuild %(debug)s --new-scheduler --cmsdist %(workdir)s/%(task_id)s/CMSDIST %(ignoreErrors)s --builders %(builders)s -j %(jobs)s --repository %(repository)s --architecture %(architecture)s --work-dir %(workdir)s/cms build %(package)s ;\n"
        "  %(workdir)s/%(task_id)s/PKGTOOLS/cmsBuild %(debug)s --new-scheduler --cmsdist %(workdir)s/%(task_id)s/CMSDIST --repository %(repository)s --upload-tmp-repository %(tmpRepository)s %(syncBack)s --architecture %(architecture)s --work-dir %(workdir)s/cms upload %(package)s ;\n"
-       "  PKG_BUILT=`find %(workdir)s/cms/RPMS/%(architecture)s -name \"*%(package)s*\"| sed -e's|.*/\\([^+]*+[^+]*+[^.]*\\).*|\\1|'`;\n"
+       "  PKG_BUILD=`find %(workdir)s/cms/RPMS/%(architecture)s -name \"*%(package)s*\"| sed -e's|.*/||g;s|-1-1.*||g'`;\n"
        "  set +x ;\n"
        "  echo Build completed. you can now install the package built by doing: ;\n"
        "  echo \"wget http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh\" ;\n"
