@@ -19,9 +19,12 @@ for WEEK in 0 1; do
     rsync -a --no-group --no-owner cmsbuild@cmsrep.cern.ch:/data/cmssw/cms.week$WEEK/WEB/build-logs/$SCRAM_ARCH/$CMSSW_NAME/logs/html/ $REL_LOGS/ || true
     # Decompress logs if they are compressed.
     if [ -f $REL_LOGS/html-logs.tgz ]; then
-      pushd $REL_LOGS
-        tar xzf html-logs.tgz
-      popd
+      if [ ! -f $REL_LOGS/done ]; then
+        pushd $REL_LOGS
+          tar xzf html-logs.tgz
+        popd
+        touch $REL_LOGS/done
+      fi
     fi
   done
 done
