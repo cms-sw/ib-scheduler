@@ -350,6 +350,7 @@ def requestBuildPackage():
   parser.add_option("--testbed", metavar="BOOL", dest="useTestBed", help="Use the testbed tag collector to ", action="store_true", default=False)
   parser.add_option("--continuations", metavar="SPEC", dest="continuations", help="Specify a comma separated list of task:architecture which need to be scheduled after if this task succeeds", default="")
   parser.add_option("--debug", metavar="BOOL", dest="debug", help="Add cmsbuild debug information", action="store_true", default=False)
+  parser.add_option("--dry-run", "-n", metavar="BOOL", dest="dryRun", help="Do not push the request to tag collector", action="store_true", default=False)
   opts, args = parser.parse_args()
   if len(args) != 2:
     print "You need to specify a package"
@@ -407,6 +408,9 @@ def requestBuildPackage():
     sys.exit(1)
   if not options.get("PKGTOOLS"):
     print "Unable to find PKGTOOLS for releases %s on %s" % (options["release_name"], options["architecture_name"])
+    sys.exit(1)
+  if opts.dryRun:
+    print "Dry run specified, the request would look like:\n %s" % str(options)
     sys.exit(1)
   tagCollectorAPI.createTaskRequest(**options)
 
