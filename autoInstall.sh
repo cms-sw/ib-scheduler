@@ -80,7 +80,7 @@ for WEEK in 0 1; do
       #mv $DESTDIR/$PKG $DESTDIR/$NEWPKG || mkdir -p $DESTDIR/$NEWPKG
       ## We need to delete the temp directory in case of failure.
       #(rsync -av -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && mv -T $DESTDIR/$NEWPKG $DESTDIR/$PKG && touch $WORKDIR/$PKG/done) || rm -rf $DESTDIR/$NEWPKG || true
-      (rsync -av -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && touch $WORKDIR/$PKG/done) || true
+      (rsync -a -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && touch $WORKDIR/$PKG/done) || true
     fi
   done
   DIRFILE=$WORKDIR/dirs$$.txt
