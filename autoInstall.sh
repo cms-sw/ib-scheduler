@@ -14,42 +14,6 @@ export BASEDIR=$2
 export BASEDESTDIR=/afs/cern.ch/cms/sw/ReleaseCandidates
 export LANG=C
 
-# In order to avoid synchronizing the whole directories every time we do the
-# following logic:
-# - Get all the package directories
-# - Check the source does not have a timestamp file in it called "done"
-# - Do the rsync to destination.
-# - Create the timestamp
-# - Remove packages which are not in the source anymore.
-for WEEK in 0 1; do
-  WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH/$SCRAM_ARCH
-  DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
-  for PKG in `find $WORKDIR/ -mindepth 3 -maxdepth 3 -type d | sort -r | sed -e "s|.*$SCRAM_ARCH/||"`; do
-    if [ ! -f  $WORKDIR/$PKG/done ]; then
-      NEWPKG=`dirname $PKG`/tmp$$-`basename $PKG`
-      mv $DESTDIR/$PKG $DESTDIR/$NEWPKG || mkdir -p $DESTDIR/$NEWPKG
-      # We need to delete the temp directory in case of failure.
-      (rsync -av -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && mv -T $DESTDIR/$NEWPKG $DESTDIR/$PKG && touch $WORKDIR/$PKG/done) || rm -rf $DESTDIR/$NEWPKG || true
-    fi
-  done
-  DIRFILE=$WORKDIR/dirs$$.txt
-  find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
-  find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"| grep -v -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'  >> $DIRFILE
-  for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
-    pushd $DESTDIR
-      rm -rf $REMOVED
-    popd
-  done
-  rm $DIRFILE
-  for LEFTOVER in `find $DESTDIR -mindepth 3 -maxdepth 3 -type d -name "tmp*-*" | grep -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'`; do
-    OLD_PID=`basename $LEFTOVER | sed -e 's|.*/tmp\([0-9]*\)-.*|\1|'`
-    if [ ! -d /proc/$OLD_PID ]; then
-      echo FOO rm -rf $LEFTOVER
-    fi
-  done
-done
-
-
 # We install packages for both weeks. We reset every two week, alternating.
 # Notice that the biweekly period for week 1 is shifted by 1 week for this
 # reason we move it away from the 0 into 52 and take the modulo 52 afterward.
@@ -93,9 +57,41 @@ for WEEK in 0 1; do
     done ;
     apt-get clean 
   ) || true 
-  # Do the final rsync for the installation relying of rsync is much better to
-  # install on afs than trusting anything else. It also has the advantage we
-  # can delete only what changed, not the whole repository.
-  rsync -a --delete --no-group --no-owner $WORKDIR/$SCRAM_ARCH/ $DESTDIR/$SCRAM_ARCH/
   rsync -a --no-group --no-owner $WORKDIR/etc/ $DESTDIR/etc/
+done
+
+# In order to avoid synchronizing the whole directories every time we do the
+# following logic:
+# - Get all the package directories
+# - Check the source does not have a timestamp file in it called "done"
+# - Do the rsync to destination.
+# - Create the timestamp
+# - Remove packages which are not in the source anymore.
+for WEEK in 0 1; do
+  WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH/$SCRAM_ARCH
+  DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
+  for PKG in `find $WORKDIR/ -mindepth 3 -maxdepth 3 -type d | sort -r | sed -e "s|.*$SCRAM_ARCH/||"`; do
+    if [ ! -f  $WORKDIR/$PKG/done ]; then
+      ##NEWPKG=`dirname $PKG`/tmp$$-`basename $PKG`
+      #mv $DESTDIR/$PKG $DESTDIR/$NEWPKG || mkdir -p $DESTDIR/$NEWPKG
+      ## We need to delete the temp directory in case of failure.
+      #(rsync -av -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && mv -T $DESTDIR/$NEWPKG $DESTDIR/$PKG && touch $WORKDIR/$PKG/done) || rm -rf $DESTDIR/$NEWPKG || true
+      (rsync -av -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && touch $WORKDIR/$PKG/done) || true
+    fi
+  done
+  DIRFILE=$WORKDIR/dirs$$.txt
+  find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
+  find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"| grep -v -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'  >> $DIRFILE
+  for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
+    pushd $DESTDIR
+      rm -rf $REMOVED
+    popd
+  done
+  rm $DIRFILE
+  for LEFTOVER in `find $DESTDIR -mindepth 3 -maxdepth 3 -type d -name "tmp*-*" | grep -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'`; do
+    OLD_PID=`basename $LEFTOVER | sed -e 's|.*/tmp\([0-9]*\)-.*|\1|'`
+    if [ ! -d /proc/$OLD_PID ]; then
+      echo FOO rm -rf $LEFTOVER
+    fi
+  done
 done
