@@ -13,6 +13,34 @@ export SCRAM_ARCH=$1
 export BASEDIR=$2
 export BASEDESTDIR=/afs/cern.ch/cms/sw/ReleaseCandidates
 export LANG=C
+
+# In order to avoid synchronizing the whole directories every time we do the
+# following logic:
+# - Get all the package directories
+# - Check the source does not have a timestamp file in it called "done"
+# - Do the rsync to destination.
+# - Create the timestamp
+# - Remove packages which are not in the source anymore.
+for WEEK in 0 1; do
+  WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH
+  DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
+  for PKG in `find $WORKDIR/ -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"`; do
+    if [ ! -f  $WORKDIR/$PKG/done ]; then
+      echo mkdir -p $DESTDIR/$PKG
+      echo rsync -av --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && touch $WORKDIR/$PKG/done
+    fi
+  done
+  DIRFILE=`mktemp`
+  find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
+  find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" >> $DIRFILE
+  for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
+    pushd $DESTDIR
+      echo rm -rf $REMOVED
+    popd
+  done
+  rm $DIRFILE
+done
+
 # We install packages for both weeks. We reset every two week, alternating.
 # Notice that the biweekly period for week 1 is shifted by 1 week for this
 # reason we move it away from the 0 into 52 and take the modulo 52 afterward.
