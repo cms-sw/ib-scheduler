@@ -51,10 +51,13 @@ for WEEK in 0 1; do
   (
     source $WORKDIR/$SCRAM_ARCH/external/apt/*/etc/profile.d/init.sh ;
     apt-get update ;
-    CMSSW_PKGS=`apt-cache search cmssw | sed -e 's/ .*//' | grep _X` ;
-    for x in $CMSSW_PKGS ; do
+    apt-cache search cmssw-ib | cut -d\  -f1 | sort > onserver$$.txt ;
+    rpm -qa --queryformat '%{NAME}\n' | grep cmssw-ib | sort > installed$$.txt ;
+    for x in `diff -u onserver$$.txt installed$$.txt | grep -e '^-' | sed -e 's/^-//'`; do
       apt-get install -q -y $x ;
     done ;
+    rm installed$$.txt ;
+    rm onserver$$.txt ;
     apt-get clean 
   ) || true 
   rsync -a --no-group --no-owner $WORKDIR/etc/ $DESTDIR/etc/
