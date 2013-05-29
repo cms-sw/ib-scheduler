@@ -24,13 +24,14 @@ export LANG=C
 for WEEK in 0 1; do
   WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH/$SCRAM_ARCH
   DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
-  for PKG in `find $WORKDIR/ -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"`; do
+  for PKG in `find $WORKDIR/ -mindepth 3 -maxdepth 3 -type d | sort -r | sed -e "s|.*$SCRAM_ARCH/||"`; do
     if [ ! -f  $WORKDIR/$PKG/done ]; then
       echo mkdir -p $DESTDIR/$PKG
-      echo rsync -av --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && echo touch $WORKDIR/$PKG/done
+      NEWPKG=`dirname $PKG`/tmp$$-`basename $PKG`
+      echo rsync -av --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && echo mv $DESTDIR/$NEWPKG $DESTDIR/$PKG && echo touch $WORKDIR/$PKG/done
     fi
   done
-  DIRFILE=`mktemp`
+  DIRFILE=$WORKDIR/dirs$$.txt
   find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
   find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" >> $DIRFILE
   for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
