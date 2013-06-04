@@ -81,6 +81,9 @@ for WEEK in 0 1; do
       (rsync -av -W --inplace --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && mv -T $DESTDIR/$NEWPKG $DESTDIR/$PKG && touch $WORKDIR/$PKG/done) || rm -rf $DESTDIR/$NEWPKG || true
       #(mkdir -p $DESTDIR/$PKG/ ;rsync -a -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && touch $WORKDIR/$PKG/done) || true
     fi
+    if [ ! -f $WORKDIR/$PKG/qa ]; then
+      touch $WORKDIR/$PKG/qa
+    fi
   done
   DIRFILE=$WORKDIR/dirs$$.txt
   find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
