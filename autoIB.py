@@ -67,6 +67,38 @@ def sanitize(s):
 def format(s, **kwds):
   return s % kwds
 
+def die(s):
+  print s
+  sys.exit(1)
+
+EXTERNAL_INFO_URL="https://raw.github.com/cms-sw/cmsdist/IB/%s/stable/config.map"
+# Get external information from github.
+# See http://cms-sw.github.io/cmsdist/ 
+# for the format of the config.map file.
+def getExternalsTags(release_queue, architecture_name):
+  # Get the mapping between architecture and release
+  url = EXTERNAL_INFO_URL % release_queue
+  try:
+    data = urlopen(url).read()
+  except:
+    die("Unable to find CMSDIST information for release queue %s." % release_queue)
+  lines = [x.strip().split(";") for x in data.split("\n") if x.strip()]
+  archInfo = {}
+  for line in lines:
+    parts = dict(x.split("=") for x in line)
+    if not "SCRAM_ARCH" in parts:
+      die("Bad file format for config.map")
+    if parts["SCRAM_ARCH"] == architecture_name:
+      archInfo = dict(parts)
+      break
+  if not archInfo.get("CMSDIST_TAG", None) or not archInfo.get("PKGTOOLS_TAG", None):
+    die(format("Could not find architecture %(architecture_name)s for release series %(release_queue)s.\n"
+               "Please update `config.map' file in the CMSDIST branch IB/%(release_queue)s/stable",
+               release_queue=release_queue,
+               architecture_name=architecture_name))
+  return {"PKGTOOLS": archInfo["PKGTOOLS_TAG"],
+          "CMSDIST": archInfo["CMSDIST_TAG"]}
+
 def process():
   # Get the first task from the list
   # Check if we know what to do
@@ -281,6 +313,7 @@ def process():
     options = {}
     options["build-task"] = "build-package"
     options["release_name"] = sanitize(release_name)
+    options["release_queue"] = expandRelease("@QUEUE", options["release_name"])
     options["real_release_name"] = sanitize(payload["real_release_name"])
     options["architecture_name"] = sanitize(architecture)
     options["repository"] = sanitize(payload["repository"])
@@ -299,22 +332,7 @@ def process():
     options["CMSDIST"] = sanitize(payload["CMSDIST"])
     # For the moment do not support continuations of continuations.
     options["continuations"] = ""
-    cmsdistTagUrl = "http://cmstags.cern.ch/tc/public/ReleaseExternalsXML?" + urllib.urlencode({"release": options["release_name"], 
-                                                                                         "architecture": options["architecture_name"]})
-    try:
-      data = urlopen(cmsdistTagUrl).read()
-    except:
-      print "Unable to find release %s for %s." % (options["release_name"],  options["architecture_name"])
-      sys.exit(1)
-    p = xml.parsers.expat.ParserCreate()
-    tags = {}
-    def start_element(name, attrs):
-      if name != "external":
-        return
-      tags[str(attrs["external"].strip())] = str(attrs["tag"].strip())
-    p.StartElementHandler = start_element
-    p.Parse(data)
-    options.update(tags)
+    options.update(getExternalsTags(options["release_queue"], options["architecture_name"]))
     if opts.useTestBed:
       options["tcBaseURL"] = TESTBED_URL
     options["request_type"] = "TASK-%s" % hash(options["package"])[0:8]
@@ -338,6 +356,7 @@ def listTasks():
   if not results:
     sys.exit(1)
   print "\n".join([str(x[0]) for x in results])
+
 
 # This will request to build a package in the repository.
 # - Setup a few parameters for the request
@@ -370,6 +389,7 @@ def requestBuildPackage():
   options["hostnameFilter"] = opts.hostnameFilter
   options["real_release_name"] = expandDates(opts.release_name)
   options["release_name"] = re.sub("_[A-Z]+_X", "_X", options["real_release_name"])
+  options["release_queue"] = expandRelease("@QUEUE", options["release_name"])
   options["architecture_name"] = opts.architecture_name
   options["repository"] = expandRelease(expandDates(opts.repository).replace("@ARCH", options["architecture_name"]), options["release_name"])
   options["tmpRepository"] = expandDates(opts.tmpRepository)
@@ -390,22 +410,9 @@ def requestBuildPackage():
     print format("WARNING: you have specified --cmsdist to overwrite the PKGTOOLS tag coming from tag collector.\n"
                  "However, this will happen only for %(package)s, continuations will still fetch those from the tagcolletor.", package=options["package"])
 
-  cmsdistTagUrl = "http://cmstags.cern.ch/tc/public/ReleaseExternalsXML?" + urllib.urlencode({"release": options["release_name"], 
-                                                                                       "architecture": options["architecture_name"]})
-  try:
-    data = urlopen(cmsdistTagUrl).read()
-  except:
-    print "Unable to find release %s for %s." % (options["release_name"],  options["architecture_name"])
-    sys.exit(1)
-  p = xml.parsers.expat.ParserCreate()
-  tags = {}
-  def start_element(name, attrs):
-    if name != "external":
-      return
-    tags[str(attrs["external"].strip())] = str(attrs["tag"].strip())
-  p.StartElementHandler = start_element
-  p.Parse(data)
-  options.update(tags)
+  # Get the mapping between architecture and release
+  options.update(getExternalsTags(options["release_queue"], options["architecture_name"]))
+ 
   if opts.pkgtools:
     options["PKGTOOLS"] = sanitize(expandRelease(opts.pkgtools, options["release_name"]).replace("@ARCH", options["architecture_name"]))
   if opts.cmsdist:
