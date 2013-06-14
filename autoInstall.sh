@@ -73,6 +73,12 @@ done
 for WEEK in 0 1; do
   WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH/$SCRAM_ARCH
   DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
+  DIRFILE=$WORKDIR/dirs$$.txt
+  find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
+  find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"| grep -v -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'  >> $DIRFILE
+  for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
+    (pushd $DESTDIR ; rm -rf $REMOVED; popd)
+  done
   for PKG in `find $WORKDIR/ -mindepth 3 -maxdepth 3 -type d | sort -r | sed -e "s|.*$SCRAM_ARCH/||"`; do
     if [ ! -f  $WORKDIR/$PKG/done ]; then
       NEWPKG=`dirname $PKG`/tmp$$-`basename $PKG`
@@ -85,19 +91,11 @@ for WEEK in 0 1; do
       touch $WORKDIR/$PKG/qa
     fi
   done
-  DIRFILE=$WORKDIR/dirs$$.txt
-  find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
-  find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"| grep -v -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'  >> $DIRFILE
-  for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
-    pushd $DESTDIR
-      rm -rf $REMOVED
-    popd
-  done
   rm $DIRFILE
   for LEFTOVER in `find $DESTDIR -mindepth 3 -maxdepth 3 -type d -name "tmp*-*" | grep -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'`; do
     OLD_PID=`basename $LEFTOVER | sed -e 's|.*/tmp\([0-9]*\)-.*|\1|'`
     if [ ! -d /proc/$OLD_PID ]; then
-      echo FOO rm -rf $LEFTOVER
+      rm -rf $LEFTOVER
     fi
   done
 done
