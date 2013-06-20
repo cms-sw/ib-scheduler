@@ -58,7 +58,7 @@ class WebBasedRequestManager(object):
     def getLatestIB(self, queue):
 
         cmd =  'export SCRAM_ARCH='+self.platf+';'
-        cmd += "scram list -c CMSSW | sort | grep '/"+queue+"_20' | awk '{print $3}' | xargs -i ls -d '{}/installed.done' 2>&1 | grep 'installed.done$' | tail -1"
+        cmd += "scram list -c CMSSW | sort | grep '/"+queue+"_20' | awk '{print $3}' | tail -1"
         print "looking for latest in ", queue, ":", cmd
         pipe = os.popen(cmd)
         line = pipe.readlines()[0]
