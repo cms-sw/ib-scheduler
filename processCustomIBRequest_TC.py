@@ -63,7 +63,7 @@ class WebBasedRequestManager(object):
         pipe = os.popen(cmd)
         line = pipe.readlines()[0]
         pipe.close()
-        line = os.path.basename(os.path.dirname(line.strip()))
+        line = os.path.basename(line.strip())
         if not line:
           raise("ERROR: Can not find release for queue "+queue+" for arch "+self.platf)
 
