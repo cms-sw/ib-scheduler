@@ -3,7 +3,7 @@ export LANG=C
 for WEEK in 0 1; do
   BIWEEK=`echo "((52 + $(date +%W) - $WEEK)/2)%26" | bc`
   # notice it must finish with something which matches %Y-%m-%d-%H00
-  BUILDS=`ssh cmsbuild@cmsrep.cern.ch find /data/cmssw/cms.week$WEEK/WEB/build-logs/ -mindepth 2 -maxdepth 2 | cut -d/ -f7,8 | grep CMSSW | grep _X_ | grep '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]$'`
+  BUILDS=`ssh cmsbuild@cmsrep.cern.ch find /data/cmssw/cms.week$WEEK/WEB/build-logs/ -mindepth 2 -maxdepth 2 | cut -d/ -f7,8 | grep CMSSW | grep _X_ | grep '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]$' || true`
   for x in $BUILDS; do
     SCRAM_ARCH=`echo $x | cut -f1 -d/`
     CMSSW_NAME=`echo $x | cut -f2 -d/`
