@@ -1,5 +1,6 @@
 #!/bin/sh -e
 export LANG=C
+IB_BASEDIR="/afs/cern.ch/cms/sw/ReleaseCandidates"
 for WEEK in 0 1; do
   BIWEEK=`echo "((52 + $(date +%W) - $WEEK)/2)%26" | bc`
   # notice it must finish with something which matches %Y-%m-%d-%H00
@@ -10,8 +11,8 @@ for WEEK in 0 1; do
     CMSSW_DATE=`echo $CMSSW_NAME | sed -e's/.*_X_//'`
     CMSSW_WEEKDAY=`python -c "import time;print time.strftime('%a', time.strptime('$CMSSW_DATE', '%Y-%m-%d-%H00')).lower()"`
     CMSSW_HOUR=`python -c "import time;print time.strftime('%H', time.strptime('$CMSSW_DATE', '%Y-%m-%d-%H00')).lower()"`
-    CMSSW_QUEUE=`echo $CMSSW_NAME | sed -e 's/CMSSW_\([0-9]\)_\([0-9]\)_.*/\1.\2/'`
-    REL_LOGS="/afs/cern.ch/cms/sw/ReleaseCandidates/$SCRAM_ARCH/www/$CMSSW_WEEKDAY/$CMSSW_QUEUE-$CMSSW_WEEKDAY-$CMSSW_HOUR/$CMSSW_NAME/new"
+    CMSSW_QUEUE=`echo $CMSSW_NAME | sed -e 's/CMSSW_\([0-9][0-9]*\)_\([0-9][0-9]*\)_.*/\1.\2/'`
+    REL_LOGS="$IB_BASEDIR/$SCRAM_ARCH/www/$CMSSW_WEEKDAY/$CMSSW_QUEUE-$CMSSW_WEEKDAY-$CMSSW_HOUR/$CMSSW_NAME/new"
     if [ -L $REL_LOGS ]; then
       rm -rf $REL_LOGS
     fi
@@ -27,4 +28,7 @@ for WEEK in 0 1; do
       fi
     fi
   done
+done
+for x in `find $IB_BASEDIR -maxdepth 5 -mindepth 5 -mtime +14 -path '*/www/*/CMSSW_*' -type d -print`; do
+  rm -rf $x
 done
