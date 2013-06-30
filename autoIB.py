@@ -1,15 +1,16 @@
 #!/usr/bin/env python
-# This script allows you to execute various misc test to automate IB building steps, in particular:
+# This script allows you to execute various misc test to automate IB building
+# steps, in particular:
 #
 # - Reset the weekly repository.
 # - Build and upload externals in the weekly repository.
 # - Build and upload ibs in the weekly repository.
 #
 from optparse import OptionParser
-import tagCollectorAPI
+import buildRequestAPI as api
 import sys, os, socket
-import urllib
 from urllib2 import urlopen
+from urllib import urlencode
 import xml.parsers.expat
 from commands import getstatusoutput
 from getpass import getuser
@@ -18,10 +19,30 @@ from os.path import abspath, join, dirname, exists, expanduser
 import re
 from Lock import Lock
 from datetime import datetime, timedelta
-try:
-  from cmssw_secrets import CMSSW_CVSPASS
-except ImportError:
-  CMSSW_CVSPASS=file(expanduser("~/.cmssw_secrets")).read()
+import ws_sso_content_reader
+scriptPath = os.path.dirname( os.path.abspath(sys.argv[0]) )
+if scriptPath not in sys.path:
+    sys.path.append(scriptPath)
+
+from all_json import loads, dumps
+
+DEFAULT_API_URL = "https://cmsgit.web.cern.ch/cmsgit/buildrequests"
+
+def setTCUrl(url):
+  DEFAULT_API_URL = url
+
+def call(obj, method, **kwds):
+  obj = str(obj).strip("/")
+  print obj,":", method
+  print kwds
+  if method == "GET":
+    opts = urlencode(kwds)
+    result = ws_sso_content_reader.getContent(join(DEFAULT_API_URL, obj) + "?" + opts, None, method)
+  elif method in ["POST", "PATCH", "DELETE"]:
+    opts = dumps(kwds)
+    result = ws_sso_content_reader.getContent(join(DEFAULT_API_URL, obj), opts, method)
+    print result
+  return loads(result)
 
 try:
   from hashlib import sha1 as sha
@@ -31,8 +52,6 @@ except ImportError:
   import sha
   def hash(s):
     return sha.new(s).hexdigest()
-
-TESTBED_URL="https://cmstags-dev.cern.ch/tc/"
 
 def overloaded(maxLoad):
   err,out = getstatusoutput("uptime | sed -e 's/^.* //'")
@@ -75,7 +94,7 @@ EXTERNAL_INFO_URL="https://raw.github.com/cms-sw/cmsdist/IB/%s/stable/config.map
 # Get external information from github.
 # See http://cms-sw.github.io/cmsdist/ 
 # for the format of the config.map file.
-def getExternalsTags(release_queue, architecture_name):
+def getExternalsTags(release_queue, architecture):
   # Get the mapping between architecture and release
   url = EXTERNAL_INFO_URL % release_queue
   try:
@@ -88,14 +107,14 @@ def getExternalsTags(release_queue, architecture_name):
     parts = dict(x.split("=") for x in line)
     if not "SCRAM_ARCH" in parts:
       die("Bad file format for config.map")
-    if parts["SCRAM_ARCH"] == architecture_name:
+    if parts["SCRAM_ARCH"] == architecture:
       archInfo = dict(parts)
       break
   if not archInfo.get("CMSDIST_TAG", None) or not archInfo.get("PKGTOOLS_TAG", None):
-    die(format("Could not find architecture %(architecture_name)s for release series %(release_queue)s.\n"
+    die(format("Could not find architecture %(architecture)s for release series %(release_queue)s.\n"
                "Please update `config.map' file in the CMSDIST branch IB/%(release_queue)s/stable",
                release_queue=release_queue,
-               architecture_name=architecture_name))
+               architecture=architecture))
   return {"PKGTOOLS": archInfo["PKGTOOLS_TAG"],
           "CMSDIST": archInfo["CMSDIST_TAG"]}
 
@@ -112,9 +131,10 @@ def process():
   parser.add_option("--builders", type="int", metavar="N", dest="builders", help="Number of packages built in parallel", default=1)
   parser.add_option("--debug", metavar="PATH", dest="debug", help="Print out what's happening", action="store_true", default=False)
   parser.add_option("--dry-run", "-n", metavar="BOOL", dest="dryRun", help="Do not execute", action="store_true", default=False)
-  parser.add_option("--testbed", metavar="BOOL", dest="useTestBed", help="Use the testbed tag collector to ", action="store_true", default=False)
+  parser.add_option("--api-url", metavar="URL", dest="apiUrl", help="Specify API endpoint URL", default=DEFAULT_API_URL)
   parser.add_option("--max-load", type="int", metavar="LOAD", dest="maxLoad", help="Do not execute if average last 15 minutes load > LOAD", default=8)
   opts, args = parser.parse_args()
+  setTCUrl(opts.apiUrl)
   if not opts.workdir:
     print "Please specify a workdir"
     sys.exit(1)
@@ -139,11 +159,10 @@ def process():
   if overloaded(opts.maxLoad):
     print "Current load exceeds maximum allowed of %s." % opts.maxLoad
     sys.exit(1)
-  options = {"release_pattern": opts.matchRelease,
-             "architecture_pattern": opts.matchArch}
-  if opts.useTestBed:
-    options["tcBaseURL"] = TESTBED_URL
-  tasks = tagCollectorAPI.listPendingTasks(**options)
+  tasks = call("/", "GET", 
+               release_match=opts.matchRelease,
+               architecture_match=opts.matchArch,
+               state="Pending")
   print tasks
   if not len(tasks):
     if opts.debug:
@@ -153,8 +172,9 @@ def process():
   # make sure we match it.
   runnableTask = None
   for task in tasks:
-    task_id, architecture_name, release_name, payloadNew = task
-    if re.match(payloadNew.get("hostnameFilter", ".*"), socket.gethostname()):
+    if not "payload" in task:
+      continue
+    if re.match(task["payload"].get("hostnameFilter", ".*"), socket.gethostname()):
       runnableTask = task
       break
   if not runnableTask:
@@ -162,8 +182,7 @@ def process():
     sys.exit(1)
   # Default payload options.
   payload = {"debug": False}
-  task_id, architecture_name, release_name, payloadNew = runnableTask
-  payload.update(payloadNew)
+  payload.update(runnableTask["payload"])
 
   # We can now specify tags in the format repository:tag to pick up branches
   # from different people.
@@ -174,29 +193,17 @@ def process():
   if ":" in payload["CMSDIST"]:
     payload["cmsdist_remote"], payload["CMSDIST"] = payload["CMSDIST"].split(":", 1)
   
-  if not payload.has_key("build-task"):
-    print "Request task %s is not a valid build task" % task_id
-    sys.exit(1)
-
-  buildTask = payload["build-task"]
-  if not buildTask in ["build-package"]:
-    print "Unknown task for request %s: %s" % (task_id, buildTask)
-    sys.exit(1)
-
   if opts.dryRun:
     print "Dry run. Not building"
     sys.exit(1)
 
-  options = {"request_id": task_id,
-             "release_name": release_name,
-             "machine": socket.gethostname(),
-             "pid": os.getpid()}
-  if opts.useTestBed:
-    options["tcBaseURL"] = TESTBED_URL
-  options["results_url"] = "http://cmssdt.cern.ch/SDT/tc-ib-logs/%s/log.%s.html" % (socket.gethostname(), task_id)
-  ok = tagCollectorAPI.setRequestBuilding(**options)
+  ok = call(runnableTask["id"], "PATCH", 
+            url="http://cmssdt.cern.ch/SDT/tc-ib-logs/%s/log.%s.html" % (socket.gethostname(), runnableTask["id"]),
+            machine=socket.gethostname(),
+            pid=os.getpid(),
+            state="Running")
   if not ok:
-    print "Could not change request %s state to building" % task_id
+    print "Could not change request %s state to building" % runnableTask["id"] 
     sys.exit(1)
   
   # Build the package.
@@ -207,7 +214,7 @@ def process():
   getstatusoutput(format(
     "echo 'Log not sync-ed yet' > %(workdir)s/log.%(task_id)s;\n"
     "%(here)s/syncLogs.py %(workdir)s",
-    task_id=task_id,
+    task_id=runnableTask["id"],
     here=thisPath, 
     workdir=opts.workdir))
   try:
@@ -216,17 +223,8 @@ def process():
        "mkdir -p %(workdir)s/%(task_id)s ;\n"
        "export CMS_PATH=%(workdir)s/cms ;\n"
        "cd %(workdir)s ;\n"
-       "( export CVSROOT=:pserver:anonymous@cmssw.cvs.cern.ch/local/reps/CMSSW ;\n"
-       "  export CVS_PASSFILE=%(workdir)s/.cvspass ;\n"
-       "  echo '/1 :pserver:anonymous@cmscvs.cern.ch:/cvs_server/repositories/CMSSW %(cvspass)s' > $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/cvs/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/cvs_server/repositories/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmscvs.cern.ch/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmscvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE ;\n"
-       "  echo '/1 :pserver:anonymous@cmssw.cvs.cern.ch:2401/local/reps/CMSSW %(cvspass)s' >> $CVS_PASSFILE;\n"
-       "  echo 'Building %(package)s using %(cmsdistRemote)s:%(cmsdistTag)s';\n"
+       "( echo 'Building %(package)s using %(cmsdistRemote)s:%(cmsdistTag)s';\n"
+       "  rm -rf %(task_id)s;\n"
        "  git clone git://github.com/%(cmsdistRemote)s/cmsdist.git %(task_id)s/CMSDIST || git clone https://:@git.cern.ch/kerberos/CMSDIST.git %(task_id)s/CMSDIST;\n"
        "  pushd %(task_id)s/CMSDIST; git checkout %(cmsdistTag)s; popd;\n"
        "  PKGTOOLS_TAG=\"`echo %(pkgtoolsTag)s | sed -e's/\\(V[0-9]*-[0-9]*\\).*/\\1-XX/'`\";\n"
@@ -250,49 +248,52 @@ def process():
        "  echo \"(source w/%(architecture)s/external/apt/*/etc/profile.d/init.sh ; apt-get install $PKG_BUILD )\" ;\n"
        "  echo AUTOIB SUCCESS) 2>&1 | tee %(workdir)s/log.%(task_id)s",
        workdir=opts.workdir,
-       cvspass=CMSSW_CVSPASS,
        debug=payload["debug"] == True and "--debug" or "",
        cmsdistTag=sanitize(payload["CMSDIST"]),
        pkgtoolsTag=sanitize(payload["PKGTOOLS"]),
        cmsdistRemote=sanitize(payload["cmsdist_remote"]),
        pkgtoolsRemote=sanitize(payload["pkgtools_remote"]),
-       architecture=sanitize(architecture_name),
-       release_name=sanitize(release_name),
-       base_release_name=re.sub("_[^_]*patch[0-9]*$", "", sanitize(payload["real_release_name"])),
-       real_release_name=sanitize(payload["real_release_name"]),
+       architecture=sanitize(runnableTask["architecture"]),
+       release_name=sanitize(re.sub("_[A-Z]+_X", "_X", runnableTask["release"])),
+       base_release_name=re.sub("_[^_]*patch[0-9]*$", "", sanitize(payload["release"])),
+       real_release_name=sanitize(payload["release"]),
        package=sanitize(payload["package"]),
        repository=sanitize(payload["repository"]),
        syncBack=payload["syncBack"] == True and "--sync-back" or "",
        ignoreErrors=payload["ignoreErrors"] == True and "-k" or "",
        tmpRepository=sanitize(payload["tmpRepository"]),
-       task_id=task_id,
+       task_id=runnableTask["id"],
        jobs=opts.jobs,
        builders=opts.builders))
     getstatusoutput(format("echo 'Task %(task_id)s completed successfully.' >> %(workdir)s/log.%(task_id)s",
                            workdir=opts.workdir,
-                           task_id=task_id))
+                           task_id=runnableTask["id"]))
   except Exception, e:
-    log = open(format("%(workdir)s/log.%(task_id)s", workdir=opts.workdir, task_id=task_id)).read()
+    log = open(format("%(workdir)s/log.%(task_id)s", workdir=opts.workdir, task_id=runnableTask["id"])).read()
     log += "\nInterrupted externally."
     log += str(e)
     getstatusoutput(format("echo 'Interrupted externally' >> %(workdir)s/log.%(task_id)s",
                            workdir=opts.workdir,
-                           task_id=task_id))
+                           task_id=runnableTask["id"]))
     
   error, saveLog = getstatusoutput(format("set -e ;\n"
        "echo '#### Log file for %(task_id)s' >> %(workdir)s/log ;\n"
        "cat %(workdir)s/log.%(task_id)s >> %(workdir)s/log",
        workdir=opts.workdir,
-       task_id=task_id))
+       task_id=runnableTask["id"]))
   
   getstatusoutput("%s/syncLogs.py %s" % (thisPath, opts.workdir))
   if not "AUTOIB SUCCESS" in log:
-    tagCollectorAPI.failRequest(request_id=task_id, results_url="http://cmssdt.cern.ch/SDT/tc-ib-logs/%s/log.%s.html" % (socket.gethostname(), task_id))
+    call(runnableTask["id"], "PATCH", 
+         state="Failed", 
+         url="http://cmssdt.cern.ch/SDT/tc-ib-logs/%s/log.%s.html" % (socket.gethostname(), runnableTask["id"] ))
     print log
     print saveLog
     sys.exit(1)
   
-  tagCollectorAPI.finishRequest(request_id=task_id, results_url="http://cmssdt.cern.ch/SDT/tc-ib-logs/%s/log.%s.html" % (socket.gethostname(), task_id))
+  call(runnableTask["id"], "PATCH", 
+       state="Completed", 
+       url="http://cmssdt.cern.ch/SDT/tc-ib-logs/%s/log.%s.html" % (socket.gethostname(), runnableTask["id"]))
 
   # Here we are done processing the job. Now schedule continuations.
   if not "continuations" in payload:
@@ -311,17 +312,6 @@ def process():
     
   for package, architecture in nextTasks:
     options = {}
-    options["build-task"] = "build-package"
-    options["release_name"] = sanitize(release_name)
-    options["release_queue"] = expandRelease("@QUEUE", options["release_name"])
-    options["real_release_name"] = sanitize(payload["real_release_name"])
-    options["architecture_name"] = sanitize(architecture)
-    options["repository"] = sanitize(payload["repository"])
-    options["tmpRepository"] = sanitize(payload["tmpRepository"])
-    options["syncBack"] = payload["syncBack"]
-    options["debug"] = payload["debug"]
-    options["ignoreErrors"] = payload["ignoreErrors"]
-    options["package"] = sanitize(package)
     # Notice that continuations will not support overriding CMSDIST and
     # PKGTOOLS completely.
     # 
@@ -332,11 +322,20 @@ def process():
     options["CMSDIST"] = sanitize(payload["CMSDIST"])
     # For the moment do not support continuations of continuations.
     options["continuations"] = ""
-    options.update(getExternalsTags(options["release_queue"], options["architecture_name"]))
-    if opts.useTestBed:
-      options["tcBaseURL"] = TESTBED_URL
-    options["request_type"] = "TASK-%s" % hash(options["package"])[0:8]
-    tagCollectorAPI.createTaskRequest(**options)
+    options.update(getExternalsTags(expandRelease("@QUEUE", payload["release"]), architecture))
+    call("", "POST",
+         release=sanitize(payload["release"]),
+         architecture=sanitize(architecture),
+         repository=sanitize(payload["repository"]),
+         tmpRepository=sanitize(payload["tmpRepository"]),
+         syncBack=payload["syncBack"],
+         debug=payload["debug"],
+         ignoreErrors=payload["ignoreErrors"],
+         package=sanitize(package),
+         PKGTOOLS=options["PKGTOOLS"],
+         CMSDIST=options["CMSDIST"],
+         continuations=options["continuations"]
+        )
 
 def listTasks():
   # Get the first task from the list
@@ -346,16 +345,27 @@ def listTasks():
   parser = OptionParser(usage="%prog list [options]")
   parser.add_option("--match-arch", metavar="REGEX", dest="matchArch", help="Limit architectures to those matching REGEX", default=".*")
   parser.add_option("--match-release", metavar="REGEX", dest="matchRelease", help="Limit releases to those matching REGEX", default=".*")
-  parser.add_option("--testbed", metavar="BOOL", dest="useTestBed", help="Use the testbed tag collector to ", action="store_true", default=False)
+  parser.add_option("--state", metavar="Running,Pending,Completed,Failed", dest="state", help="Show requests in the given state", default="Running")
+  parser.add_option("--format", metavar="FORMAT", dest="format", help="Output format", default="%i: %p %r %a")
+  parser.add_option("--api-url", metavar="URL", dest="apiUrl", help="Specify API endpoint", default=DEFAULT_API_URL)
   opts, args = parser.parse_args()
-  options = {"release_pattern": opts.matchRelease,
-             "architecture_pattern": opts.matchArch}
-  if opts.useTestBed:
-    options["tcBaseURL"] = TESTBED_URL
-  results = tagCollectorAPI.listPendingTasks(**options)
+  setTCUrl(opts.apiUrl)
+  results = call("/", "GET", 
+                 release_match=opts.matchRelease,
+                 architecture_match=opts.matchArch,
+                 state=opts.state)
   if not results:
     sys.exit(1)
-  print "\n".join([str(x[0]) for x in results])
+  replacements = [("i", "id"),
+                  ("p", "package"),
+                  ("a", "architecture"),
+                  ("r", "release"),
+                  ("s", "state")]
+  opts.format = opts.format.replace("%", "%%")
+  for x, y in replacements:
+    opts.format = opts.format.replace("%%" + x, "%(" + y + ")s")
+  results = [x.update(x["payload"]) or x for x in results]
+  print "\n".join([opts.format % x for x in results])
 
 
 # This will request to build a package in the repository.
@@ -364,8 +374,8 @@ def listTasks():
 # - Create the request.
 def requestBuildPackage():
   parser = OptionParser()
-  parser.add_option("--release", "-r", metavar="RELEASE", dest="release_name", help="Specify release.", default=None)
-  parser.add_option("--architecture", "-a", metavar="ARCHITECTURE", dest="architecture_name", help="Specify architecture", default=None)
+  parser.add_option("--release", "-r", metavar="RELEASE", dest="release", help="Specify release.", default=None)
+  parser.add_option("--architecture", "-a", metavar="ARCHITECTURE", dest="architecture", help="Specify architecture", default=None)
   parser.add_option("--repository", "-d", metavar="REPOSITORY NAME", dest="repository", help="Specify repository to use for bootstrap", default="cms")
   parser.add_option("--upload-tmp-repository", metavar="REPOSITORY SUFFIX", dest="tmpRepository", help="Specify repository suffix to use for upload", default=getuser())
   parser.add_option("--pkgtools", metavar="TAG", dest="pkgtools", help="Specify PKGTOOLS version to use. You can specify <user>:<tag> to try out a non official tag.", default=None)
@@ -373,34 +383,35 @@ def requestBuildPackage():
   parser.add_option("--hostname-filter", metavar="HOSTNAME-REGEX", dest="hostnameFilter", help="Specify a given regular expression which must be matched by the hostname of the builder machine.", default=".*")
   parser.add_option("--sync-back", metavar="BOOL", dest="syncBack", action="store_true", help="Specify whether or not to sync back the repository after upload", default=False)
   parser.add_option("--ignore-compilation-errors", "-k", metavar="BOOL", dest="ignoreErrors", help="When supported by the spec, ignores compilation errors and still packages the available build products", action="store_true", default=False)
-  parser.add_option("--testbed", metavar="BOOL", dest="useTestBed", help="Use the testbed tag collector to ", action="store_true", default=False)
+  parser.add_option("--api-url", metavar="url", dest="apiUrl", help="Specify the url for the API", default=DEFAULT_API_URL)
   parser.add_option("--continuations", metavar="SPEC", dest="continuations", help="Specify a comma separated list of task:architecture which need to be scheduled after if this task succeeds", default="")
   parser.add_option("--debug", metavar="BOOL", dest="debug", help="Add cmsbuild debug information", action="store_true", default=False)
   parser.add_option("--dry-run", "-n", metavar="BOOL", dest="dryRun", help="Do not push the request to tag collector", action="store_true", default=False)
   opts, args = parser.parse_args()
   if len(args) != 2:
-    print "You need to specify a package"
-    sys.exit(1)
+    parser.error("You need to specify a package")
+  setTCUrl(opts.apiUrl)
+
   if not opts.repository:
-    print "Please specify a repository"
-    sys.exit(1)
+    parser.error("Please specify a repository")
+  if not opts.release:
+    parser.error("Please specify a release")
+  if not opts.architecture:
+    parser.error("Please specify an architecture")
+
   options = {}
-  options["build-task"] = "build-package"
   options["hostnameFilter"] = opts.hostnameFilter
-  options["real_release_name"] = expandDates(opts.release_name)
-  options["release_name"] = re.sub("_[A-Z]+_X", "_X", options["real_release_name"])
-  options["release_queue"] = expandRelease("@QUEUE", options["release_name"])
-  options["architecture_name"] = opts.architecture_name
-  options["repository"] = expandRelease(expandDates(opts.repository).replace("@ARCH", options["architecture_name"]), options["release_name"])
+  options["release"] = expandDates(opts.release)
+  options["release_queue"] = expandRelease("@QUEUE", options["release"])
+  options["architecture"] = opts.architecture
+  options["repository"] = expandRelease(expandDates(opts.repository).replace("@ARCH", options["architecture"]), options["release"])
   options["tmpRepository"] = expandDates(opts.tmpRepository)
   options["syncBack"] = opts.syncBack
   options["package"] = expandDates(args[1])
-  options["continuations"] = opts.continuations
+  options["continuations"] = opts.continuations.replace("@ARCH", options["architecture"])
+
   options["ignoreErrors"] = opts.ignoreErrors
   options["debug"] = opts.debug
-  if opts.useTestBed:
-    options["tcBaseURL"] = TESTBED_URL
-  options["request_type"] = "TASK-%s" % hash(expandDates(args[1] + options["real_release_name"]))[0:8]
 
   if opts.cmsdist and opts.continuations:
     print format("WARNING: you have specified --pkgtools to overwrite the PKGTOOLS tag coming from tag collector.\n"
@@ -411,37 +422,58 @@ def requestBuildPackage():
                  "However, this will happen only for %(package)s, continuations will still fetch those from the tagcolletor.", package=options["package"])
 
   # Get the mapping between architecture and release
-  options.update(getExternalsTags(options["release_queue"], options["architecture_name"]))
+  options.update(getExternalsTags(options["release_queue"], options["architecture"]))
  
   if opts.pkgtools:
-    options["PKGTOOLS"] = sanitize(expandRelease(opts.pkgtools, options["release_name"]).replace("@ARCH", options["architecture_name"]))
+    options["PKGTOOLS"] = sanitize(expandRelease(opts.pkgtools, options["release"]).replace("@ARCH", options["architecture"]))
   if opts.cmsdist:
-    options["CMSDIST"] = sanitize(expandRelease(opts.cmsdist, options["release_name"]).replace("@ARCH", options["architecture_name"]))
+    options["CMSDIST"] = sanitize(expandRelease(opts.cmsdist, options["release"]).replace("@ARCH", options["architecture"]))
   if not options.get("CMSDIST"):
-    print "Unable to find CMSDIST for releases %s on %s" % (options["release_name"], options["architecture_name"])
+    print "Unable to find CMSDIST for releases %s on %s" % (options["release"], options["architecture"])
     sys.exit(1)
   if not options.get("PKGTOOLS"):
-    print "Unable to find PKGTOOLS for releases %s on %s" % (options["release_name"], options["architecture_name"])
+    print "Unable to find PKGTOOLS for releases %s on %s" % (options["release"], options["architecture"])
     sys.exit(1)
   if opts.dryRun:
     print "Dry run specified, the request would look like:\n %s" % str(options)
     sys.exit(1)
-  tagCollectorAPI.createTaskRequest(**options)
+  call("", "POST", **options)
 
 def cancel():
   parser = OptionParser(usage="%prog cancel <request-id>")
+  parser.add_option("--api-url", metavar="url", dest="apiUrl", help="Specify the url for the API", default=DEFAULT_API_URL)
   opts, args = parser.parse_args()
+  setTCUrl(opts.apiUrl)
   if not len(args):
     print "Please specify a request id."
-  ok = tagCollectorAPI.cancelRequest(args[1])
+  ok = call(args[1], "DELETE")
   if not ok:
     print "Error while cancelling request %s" % args[1]
     sys.exit(1)
 
+def reschedule():
+  parser = OptionParser(usage="%prog reschedule <request-id>")
+  parser.add_option("--api-url", metavar="url", dest="apiUrl", help="Specify the url for the API", default=DEFAULT_API_URL)
+  opts, args = parser.parse_args()
+  setTCUrl(opts.apiUrl)
+  if not len(args):
+    print "Please specify a request id."
+  ok = call(args[1], "PATCH",
+            pid="",
+            machine="",
+            url="",
+            state="Pending")
+  if not ok:
+    print "Error while rescheduling request %s" % args[1]
+    sys.exit(1)
+
+
 COMMANDS = {"process": process, 
             "cancel": cancel,
             "list":  listTasks,
-            "request": requestBuildPackage}
+            "request": requestBuildPackage,
+            "reschedule": reschedule
+           }
 
 if __name__ == "__main__":
   os.environ["LANG"] = "C"
