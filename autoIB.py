@@ -29,6 +29,7 @@ from all_json import loads, dumps
 DEFAULT_API_URL = "https://cmsgit.web.cern.ch/cmsgit/buildrequests"
 
 def setTCUrl(url):
+  global DEFAULT_API_URL
   DEFAULT_API_URL = url
 
 def call(obj, method, **kwds):
