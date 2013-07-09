@@ -1,10 +1,13 @@
 #!/bin/sh -e
 export LANG=C
 IB_BASEDIR="/afs/cern.ch/cms/sw/ReleaseCandidates"
+# Remove from AFS logs for releases older than 7 days.
+find $IB_BASEDIR -maxdepth 5 -mindepth 5 -mtime +7 -path '*/www/*/CMSSW_*' -type d -exec rm -rf {} \; || true
 for WEEK in 0 1; do
   BIWEEK=`echo "((52 + $(date +%W) - $WEEK)/2)%26" | bc`
   # notice it must finish with something which matches %Y-%m-%d-%H00
-  BUILDS=`ssh cmsbuild@cmsrep.cern.ch find /data/cmssw/cms.week$WEEK/WEB/build-logs/ -mindepth 2 -maxdepth 2 | cut -d/ -f7,8 | grep CMSSW | grep _X_ | grep '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]$' || true`
+  # We only sync the last 7 days.
+  BUILDS=`ssh cmsbuild@cmsrep.cern.ch find /data/cmssw/cms.week$WEEK/WEB/build-logs/ -mtime -7 -mindepth 2 -maxdepth 2 | cut -d/ -f7,8 | grep CMSSW | grep _X_ | grep '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]$' || true`
   for x in $BUILDS; do
     SCRAM_ARCH=`echo $x | cut -f1 -d/`
     CMSSW_NAME=`echo $x | cut -f2 -d/`
@@ -28,7 +31,4 @@ for WEEK in 0 1; do
       fi
     fi
   done
-done
-for x in `find $IB_BASEDIR -maxdepth 5 -mindepth 5 -mtime +14 -path '*/www/*/CMSSW_*' -type d -print`; do
-  rm -rf $x
 done
