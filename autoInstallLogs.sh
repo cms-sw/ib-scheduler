@@ -22,13 +22,6 @@ for WEEK in 0 1; do
     mkdir -p $REL_LOGS || echo "Cannot create directory for $REL_LOGS"
     rsync -a --no-group --no-owner cmsbuild@cmsrep.cern.ch:/data/cmssw/cms.week$WEEK/WEB/build-logs/$SCRAM_ARCH/$CMSSW_NAME/logs/html/ $REL_LOGS/ || echo "Unable to sync logs in $REL_LOGS."
     # Decompress logs if they are compressed.
-    if [ -f $REL_LOGS/html-logs.tgz ]; then
-      if [ ! -f $REL_LOGS/done ]; then
-        pushd $REL_LOGS
-          tar xzf html-logs.tgz || echo "Unable to unpack logs in $REL_LOGS."
-        popd
-        touch $REL_LOGS/done || echo "Cannot mark $REL_LOGS completed."
-      fi
-    fi
+    tar xzf html-logs.tgz ./logAnalysis.pkl || echo "Unable to unpack logs in $REL_LOGS."
   done
 done
