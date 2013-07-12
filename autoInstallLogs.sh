@@ -2,7 +2,7 @@
 export LANG=C
 IB_BASEDIR="/afs/cern.ch/cms/sw/ReleaseCandidates"
 # Remove from AFS logs for releases older than 7 days.
-find $IB_BASEDIR -maxdepth 5 -mindepth 5 -mtime +7 -path '*/www/*/CMSSW_*' -type d -exec rm -rf {} \; || true
+find $IB_BASEDIR -maxdepth 5 -mindepth 5 -mtime +6 -path '*/www/*/CMSSW_*' -type d -exec rm -rf {} \; || true
 for WEEK in 0 1; do
   BIWEEK=`echo "((52 + $(date +%W) - $WEEK)/2)%26" | bc`
   # notice it must finish with something which matches %Y-%m-%d-%H00
