@@ -2,21 +2,22 @@
 ###Description: The tool reads cern web services behind SSO using user certificates
 import os, urllib, urllib2, httplib, cookielib, sys, HTMLParser, re
 from optparse import OptionParser
-from os.path import expanduser
+from os.path import expanduser, dirname, realpath
+from logging import debug, error, warning, DEBUG
+import logging
 
-def getFile(path):
-  npath = os.path.expanduser(path)
-  while os.path.islink(npath):
-    path = os.readlink(npath)
-    if path[0] != "/": path = os.path.join(os.path.dirname(npath),path)
-    npath = path
-  return npath
+DEFAULT_CERT_PATH="~/.globus/usercert.pem"
+DEFAULT_KEY_PATH="~/.globus/userkey.pem"
+
+def setDefaultCertificate(cert, key):
+  DEFAULT_CERT_PATH=cert
+  DEFAULT_KEY_PATH=key
 
 class HTTPSClientAuthHandler(urllib2.HTTPSHandler):  
-  def __init__(self, key, cert):  
+  def __init__(self):  
     urllib2.HTTPSHandler.__init__(self)  
-    self.key = getFile(key)  
-    self.cert = getFile(cert) 
+    self.key = realpath(expanduser(DEFAULT_KEY_PATH))
+    self.cert = realpath(expanduser(DEFAULT_CERT_PATH))
 
   def https_open(self, req):  
     return self.do_open(self.getConnection, req)  
@@ -24,98 +25,79 @@ class HTTPSClientAuthHandler(urllib2.HTTPSHandler):
   def getConnection(self, host, timeout=300):  
     return httplib.HTTPSConnection(host, key_file=self.key, cert_file=self.cert)
 
-def _getResponse(opener, url, post_data=None, debug=False):
-  response = opener.open(url, post_data)
-  if debug:
-    sys.stderr.write("Code: %s\n" % response.code)
-    sys.stderr.write("Headers: %s\n" % response.headers)
-    sys.stderr.write("Msg: %s\n" % response.msg)
-    sys.stderr.write("Url: %s\n" % response.url)
+def _getResponse(opener, url, data=None, method="GET"):
+  request = urllib2.Request(url)
+  if data:
+    request.add_data(data)
+  if method != "GET":
+    request.get_method = lambda : method
+  response = opener.open(request)
+  debug("Code: %s\n" % response.code)
+  debug("Headers: %s\n" % response.headers)
+  debug("Msg: %s\n" % response.msg)
+  debug("Url: %s\n" % response.url)
   return response
 
-def getResponseContent(opener, url, post_data=None, debug=False):
-  return _getResponse(opener, url, post_data, debug).read()
-
-def getResponseURL(opener, url, post_data=None, debug=False):
-  return urllib2.unquote(_getResponse(opener, url, post_data, debug).url)
-
-def getParentURL(url):
-  items = url.split("/")
-  return '%s//%s/%s/' % (items[0],items[2],items[3])
-
-def getSSOCookie(opener, target_url, cookie, debug=False):
+def getSSOCookie(opener, target_url, cookie):
   opener.addheaders = [('User-agent', 'curl-sso-certificate/0.0.2')] #in sync with cern-get-sso-cookie tool
-  url = getResponseURL(opener, getParentURL(target_url), debug=debug)
-  content = getResponseContent(opener, url, debug=debug)
+  # For some reason before one needed to have a parent url. Now this does not seem to be the case anymore... 
+  #parentUrl = "/".join(target_url.split("/", 4)[0:5]) + "/"
+  parentUrl = target_url
+  print parentUrl
+  url = urllib2.unquote(_getResponse(opener, parentUrl).url)
+  content = _getResponse(opener, url).read()
   ret = re.search('<form .+? action="(.+?)">', content)
   if ret == None:
     raise Exception("error: The page doesn't have the form with adfs url, check 'User-agent' header")
   url = urllib2.unquote(ret.group(1))
   h = HTMLParser.HTMLParser()
-  post_data_local = ''
+  post_data_local = []
   for match in re.finditer('input type="hidden" name="([^"]*)" value="([^"]*)"', content):
-    post_data_local += "&%s=%s" % (match.group(1), urllib.quote(h.unescape(match.group(2))))
-    is_link_found = True
+    post_data_local += [(match.group(1), h.unescape(match.group(2)))]
   
-  if not is_link_found:
+  if not post_data_local:
     raise Exception("error: The page doesn't have the form with security attributes, check 'User-agent' header")
-  post_data_local = post_data_local[1:] #remove first &
-  getResponseContent(opener, url, post_data_local, debug)
+  _getResponse(opener, url, urllib.urlencode(post_data_local)).read()
 
-def getContent(target_url, cert_path, key_path, post_data=None, debug=False, adfslogin=None):
-  cert_path = expanduser(cert_path)
-  key_path = expanduser(key_path)
-  opener = urllib2.build_opener(urllib2.HTTPSHandler())
-  if adfslogin:
-    opener.addheaders = [('Adfs-Login', adfslogin)] #local version of tc test
-  
-  #try to access the url first
-  try:
-    content = getResponseContent(opener, target_url, post_data, debug)
-    if not 'Sign in with your CERN account' in content:
-      return content
-  except Exception:
-    if debug:
-      sys.stderr.write("The request has an error, will try to create a new cookie\n")
-
+def getContent(target_url, post_data=None, method="GET"):
+  cert_path = expanduser(DEFAULT_CERT_PATH)
+  key_path = expanduser(DEFAULT_KEY_PATH)
   cookie = cookielib.CookieJar()
-  opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie), HTTPSClientAuthHandler(key_path, cert_path))  #will use private key and ceritifcate
-  if debug:
-    sys.stderr.write("The return page is sso login page, will request cookie.")
+  opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cookie), HTTPSClientAuthHandler())
+  debug("The return page is sso login page, will request cookie.")
   hasCookie = False
   # if the access gave an exception, try to get a cookie
   try:
-    getSSOCookie(opener, target_url, cookie, debug)
+    getSSOCookie(opener, target_url, cookie)
     hasCookie = True 
-    result = getResponseContent(opener, target_url, post_data, debug)
-  except Exception, e:
-    result = ""
-    print sys.stderr.write("ERROR:"+str(e))
-  if hasCookie:
-    burl = getParentURL(target_url)
-    try:
-      _getResponse(opener, burl+"signOut").read()
-      _getResponse(opener, "https://login.cern.ch/adfs/ls/?wa=wsignout1.0").read()
-    except:
-      sys.stderr.write("Error, could not logout correctly from server") 
+    result = _getResponse(opener, target_url, post_data, method).read()
+  finally:
+    if hasCookie:
+      try:
+        _getResponse(opener, "https://login.cern.ch/adfs/ls/?wa=wsignout1.0").read()
+      except:
+        error("Error, could not logout correctly from server") 
   return result
-
-def checkRequiredArguments(opts, parser):
-  missing_options = []
-  for option in parser.option_list:
-    if re.match(r'^\[REQUIRED\]', option.help) and eval('opts. %s' % option.dest) == None:
-      missing_options.extend(option._long_opts)
-    if len(missing_options) > 0:
-      parser.error('Missing REQUIRED parameters: %s' % str(missing_options))    
 
 if __name__ == "__main__":
   parser = OptionParser(usage="%prog [-d(ebug)] -o(ut) COOKIE_FILENAME -c(cert) CERN-PEM -k(ey) CERT-KEY -u(rl) URL") 
   parser.add_option("-d", "--debug", dest="debug", help="Enable pycurl debugging. Prints to data and headers to stderr.", action="store_true", default=False)
   parser.add_option("-p", "--postdata", dest="postdata", help="Data to be sent as post request", action="store", default=None)
-  parser.add_option("-c", "--cert", dest="cert_path", help="[REQUIRED] Absolute path to cert file.", action="store")
-  parser.add_option("-k", "--key", dest="key_path", help="[REQUIRED] Absolute path to key file.", action="store")
-  parser.add_option("-u", "--url", dest="url", help="[REQUIRED] Url to a service behind the SSO", action="store")
+  parser.add_option("-m", "--method", dest="method", help="Method to be used for the request", action="store", default="GET")
+  parser.add_option("-c", "--cert", dest="cert_path", help="Absolute path to cert file.", action="store", default=DEFAULT_CERT_PATH)
+  parser.add_option("-k", "--key", dest="key_path", help="Absolute path to key file.", action="store", default=DEFAULT_KEY_PATH)
   (opts, args) = parser.parse_args()
-  checkRequiredArguments(opts, parser)
-  content = getContent(opts.url, opts.cert_path, opts.key_path, opts.postdata, opts.debug)
+  if not len(args) == 1:
+    parser.error("Please specify a URL")
+  url = args[0]
+  if opts.debug:
+    logging.getLogger().setLevel(DEBUG)
+  if opts.postdata == "-":
+    opts.postdata = sys.stdin.read()
+  try:
+    setDefaultCertificate(opts.cert_path, opts.key_path)
+    content = getContent(url, opts.postdata, opts.method)
+  except urllib2.HTTPError, e:
+    print e
+    content = ""
   print content
