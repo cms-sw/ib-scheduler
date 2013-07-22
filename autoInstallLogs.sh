@@ -13,7 +13,7 @@ for WEEK in 0 1; do
   for x in $BUILDS; do
     SCRAM_ARCH=`echo $x | cut -f1 -d/`
     CMSSW_NAME=`echo $x | cut -f2 -d/`
-    CMSSW_DATE=`echo $CMSSW_NAME | sed -e's/.*_X_//'`
+    CMSSW_DATE=`echo $CMSSW_NAME | sed -e's/.*\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[0-9][0-9][0-9][0-9]\)$/\1/'`
     CMSSW_WEEKDAY=`python -c "import time;print time.strftime('%a', time.strptime('$CMSSW_DATE', '%Y-%m-%d-%H00')).lower()"`
     CMSSW_HOUR=`python -c "import time;print time.strftime('%H', time.strptime('$CMSSW_DATE', '%Y-%m-%d-%H00')).lower()"`
     CMSSW_QUEUE=`echo $CMSSW_NAME | sed -e 's/CMSSW_\([0-9][0-9]*\)_\([0-9][0-9]*\)_.*/\1.\2/'`
