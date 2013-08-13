@@ -101,7 +101,8 @@ for REPOSITORY in $REPOSITORIES; do
   for LEFTOVER in `find $DESTDIR -mindepth 3 -maxdepth 3 -type d -name "tmp*-*" | grep -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'`; do
     OLD_PID=`basename $LEFTOVER | sed -e 's|.*/tmp\([0-9]*\)-.*|\1|'`
     if [ ! -d /proc/$OLD_PID ]; then
-      rm -rf $LEFTOVER
+      # Do not die when weird AFS lock files are found.
+      rm -rf $LEFTOVER || true
     fi
   done
 done
