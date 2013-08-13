@@ -13,27 +13,30 @@ export SCRAM_ARCH=$1
 export BASEDIR=$2
 export BASEDESTDIR=/afs/cern.ch/cms/sw/ReleaseCandidates
 export LANG=C
+# The repositories we need to install are those for which we find the 
+# timestamp files:
+REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename`
+echo $REPOSITORIES
 
 # We install packages for both weeks. We reset every two week, alternating.
 # Notice that the biweekly period for week 1 is shifted by 1 week for this
 # reason we move it away from the 0 into 52 and take the modulo 52 afterward.
 # Potentially we could separate the installation of the two volumes so that 
 # we don't need a huge local disk, but we can scatter this on different machienes.
-for WEEK in 0 1; do
-  BIWEEK=`echo "((52 + $(date +%W) - $WEEK)/2)%26" | bc`
-  WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH
+for REPOSITORY in $REPOSITORIES; do
+  echo $REPOSITORY
+  WEEK=$(echo "$(echo $REPOSITORY | cut -d- -f2) % 2" | bc) 
+  WORKDIR=$BASEDIR/$REPOSITORY/$SCRAM_ARCH
   DESTDIR=$BASEDESTDIR/vol$WEEK
   mkdir -p $WORKDIR
   # Due to a bug in bootstrap.sh I need to install separate archs in separate directories.
   # This is because bootstraptmp is otherwise shared between different arches. Sigh.
-  LOGFILE=$WORKDIR/bootstrap-$BIWEEK.log
+  LOGFILE=$WORKDIR/bootstrap-$REPOSITORY.log
   # If the bootstrap log for the current two week period is not there
   # rebootstrap the area.
-  if [ ! -e $LOGFILE ]; then
+  if [ ! -f $LOGFILE ]; then
     # We move it so that if we are slow removing it, we do not endup removing
     # what got installed by someone else.  
-    mv $WORKDIR $WORKDIR.old
-    rm -rf $WORKDIR.old
     mkdir -p $WORKDIR/common
     touch $LOGFILE
     wget -O $WORKDIR/bootstrap.sh http://cmsrep.cern.ch/cmssw/cms/bootstrap.sh
@@ -62,6 +65,8 @@ for WEEK in 0 1; do
   ) || true 
   rsync -a --no-group --no-owner $WORKDIR/etc/ $DESTDIR/etc/
 done
+REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename`
+echo $REPOSITORIES
 
 # In order to avoid synchronizing the whole directories every time we do the
 # following logic:
@@ -70,8 +75,9 @@ done
 # - Do the rsync to destination.
 # - Create the timestamp
 # - Remove packages which are not in the source anymore.
-for WEEK in 0 1; do
-  WORKDIR=$BASEDIR/vol$WEEK/$SCRAM_ARCH/$SCRAM_ARCH
+for REPOSITORY in $REPOSITORIES; do
+  WEEK=$(echo "$(echo $REPOSITORY | cut -d- -f2) % 2" | bc) 
+  WORKDIR=$BASEDIR/$REPOSITORY/$SCRAM_ARCH/$SCRAM_ARCH
   DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
   DIRFILE=$WORKDIR/dirs$$.txt
   find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
@@ -84,7 +90,7 @@ for WEEK in 0 1; do
       NEWPKG=`dirname $PKG`/tmp$$-`basename $PKG`
       mv $DESTDIR/$PKG $DESTDIR/$NEWPKG || mkdir -p $DESTDIR/$NEWPKG
       # We need to delete the temp directory in case of failure.
-      (rsync -av -W --inplace --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && mv -T $DESTDIR/$NEWPKG $DESTDIR/$PKG && touch $WORKDIR/$PKG/done) || rm -rf $DESTDIR/$NEWPKG || true
+      (rsync -a -W --inplace --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$NEWPKG/ && mv -T $DESTDIR/$NEWPKG $DESTDIR/$PKG && touch $WORKDIR/$PKG/done) || rm -rf $DESTDIR/$NEWPKG || true
       #(mkdir -p $DESTDIR/$PKG/ ;rsync -a -W --delete --no-group --no-owner $WORKDIR/$PKG/ $DESTDIR/$PKG/ && touch $WORKDIR/$PKG/done) || true
     fi
     if [ ! -f $WORKDIR/$PKG/qa ]; then
