@@ -87,7 +87,9 @@ for REPOSITORY in $REPOSITORIES; do
   # the reposiries.
   mkdir -p $WORKDIR
   find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
+  set +e
   find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"| grep -v -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'  >> $DIRFILE
+  set -e
   for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
     (pushd $DESTDIR ; rm -rf $REMOVED; popd)
   done
