@@ -63,6 +63,9 @@ for REPOSITORY in $REPOSITORIES; do
     rm onserver$$.txt ;
     apt-get clean 
   ) || true 
+  # We create the directory in any case, to avoid the rsync to fail in case 
+  # the repository is not there and we cannot install.
+  mkdir -p $WORKDIR/etc/
   rsync -a --no-group --no-owner $WORKDIR/etc/ $DESTDIR/etc/
 done
 REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename`
