@@ -83,6 +83,9 @@ for REPOSITORY in $REPOSITORIES; do
   WORKDIR=$BASEDIR/$REPOSITORY/$SCRAM_ARCH/$SCRAM_ARCH
   DESTDIR=$BASEDESTDIR/vol$WEEK/$SCRAM_ARCH
   DIRFILE=$WORKDIR/dirs$$.txt
+  # Again, we create the WORKDIR to handle the case we cannot bootstrap one of
+  # the reposiries.
+  mkdir -p $WORKDIR
   find $WORKDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||" > $DIRFILE
   find $DESTDIR -mindepth 3 -maxdepth 3 -type d | sed -e "s|.*$SCRAM_ARCH/||"| grep -v -e '.*/tmp[0-9][0-9]*-[^/][^/]*$'  >> $DIRFILE
   for REMOVED in `cat $DIRFILE | sort | uniq -c | grep -e "^ " | grep -e '^[^1]*1 '| sed -e's/^[^1]*1 //'`; do
