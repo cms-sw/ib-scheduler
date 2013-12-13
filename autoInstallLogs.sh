@@ -27,7 +27,8 @@ for WEEK in 0 1; do
       if [ -f html-logs.tgz ] ; then
         tar xzf html-logs.tgz ./logAnalysis.pkl ./index.html || echo "Unable to unpack logs in $REL_LOGS."
       elif [ -f html-logs.zip ] ; then
-        unzip -p html-logs.zip ./logAnalysis.pkl ./index.html || echo "Unable to unpack logs in $REL_LOGS."
+        unzip -p html-logs.zip logAnalysis.pkl > logAnalysis.pkl || echo "Unable to unpack logs in $REL_LOGS."
+        unzip -p html-logs.zip index.html >  index.html || echo "Unable to unpack logs in $REL_LOGS."
       fi
     popd
   done
