@@ -15,7 +15,7 @@ export BASEDESTDIR=/afs/cern.ch/cms/sw/ReleaseCandidates
 export LANG=C
 # The repositories we need to install are those for which we find the 
 # timestamp files:
-REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename`
+REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename | sort -r -n`
 echo $REPOSITORIES
 
 # We install packages for both weeks. We reset every two week, alternating.
@@ -68,7 +68,7 @@ for REPOSITORY in $REPOSITORIES; do
   mkdir -p $WORKDIR/etc/
   rsync -a --no-group --no-owner $WORKDIR/etc/ $DESTDIR/etc/
 done
-REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename`
+REPOSITORIES=`find /afs/cern.ch/cms/sw/ReleaseCandidates/reset-repo-info -type f | tail -2 | xargs -n1 basename | sort -r -n`
 echo $REPOSITORIES
 
 # In order to avoid synchronizing the whole directories every time we do the
