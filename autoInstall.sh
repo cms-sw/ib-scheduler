@@ -57,7 +57,9 @@ for REPOSITORY in $REPOSITORIES; do
     apt-cache search cmssw-ib\\+CMSSW | cut -d\  -f1 | sort > onserver$$.txt ;
     rpm -qa --queryformat '%{NAME}\n' | grep cmssw-ib | sort > installed$$.txt ;
     for x in `diff -u onserver$$.txt installed$$.txt | grep -e '^-[^-]' | sed -e 's/^-//'`; do
-      apt-get install -q -y $x `echo $x | sed -e 's/cmssw-ib/cmssw/'`;
+      apt-get install -q -y $x || true;
+      apt-get install -q -y `echo $x | sed -e 's/cmssw-ib/cmssw/'` || true;
+      apt-get install -q -y `echo $x | sed -e 's/cmssw-ib/cmssw-patch/'` || true;
     done ;
     rm installed$$.txt ;
     rm onserver$$.txt ;
