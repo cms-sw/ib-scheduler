@@ -19,8 +19,9 @@ class Process:
     self.cmd = cmd
     self.arg = arg
     self.ppid = ppid
-    self.xinfo = xinfo.split()
-    self.stime = (datetime.datetime.today() - datetime.datetime(*time.strptime(stime, '%a %b %d %H:%M:%S %Y')[0:6])).seconds
+    self.xinfo = xinfo.split()    
+    self.stime = datetime.datetime.today() - datetime.datetime(*time.strptime(stime, '%a %b %d %H:%M:%S %Y')[0:6])
+    self.stime = (self.stime.days*86400)+self.stime.seconds
 
   def addChild(self, pid):
     self.child.append(pid)
