@@ -108,8 +108,8 @@ if __name__ == "__main__" :
 
   dryRun = False
   repo   = '/data/cmssw/cms'
-  days   = 7
-  trans  = 10
+  days   = 3
+  trans  = 5
   quiet  = False
   tmpClean = False
     
