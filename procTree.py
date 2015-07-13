@@ -34,9 +34,9 @@ class ProcessTree:
 
   def allProcesses(self, user=None, xinfo=None):
     if not user: user = getpass.getuser()
-    cmd = 'ps -ao '
+    cmd = 'ps -ao user,'
     if xinfo: cmd += xinfo+','
-    cmd += 'pid,ppid,lstart,comm,args -U %s -u %s' % (user,user)
+    cmd += 'pid,ppid,lstart,comm,args -u %s -U %s' % (user, user)
     pipe = os.popen(cmd)
     res = pipe.readlines()
     pipe.close()
@@ -44,6 +44,8 @@ class ProcessTree:
     pRE = re.compile('^\s*(.*\s+|)(\d+)\s+(\d+)\s+([A-Za-z]{3} [A-Za-z]{3} \s*\d{1,2} \d\d:\d\d:\d\d \d{4})\s+([^\s]+)\s*(.*)$')
     xpid = os.getpid()
     for pros in res:
+      if not pros.startswith(user+' '): continue
+      pros = re.sub('^'+user+' ','',pros)
       m = pRE.match(pros)
       if m:
          pid = m.group(2)
