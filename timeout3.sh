@@ -4,7 +4,7 @@
 # Upon time-out expiration SIGTERM (15) is sent to the process. If the signal
 # is blocked, then the subsequent SIGKILL (9) terminates it.
 #
-# Based on the Bash documentation example.
+# Based on the Bash documentation example. 
 
 # Hello Chet,
 # please find attached a "little easier"  :-)  to comprehend
